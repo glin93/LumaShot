@@ -1,0 +1,16 @@
+LumaShot 0.1.0
+Copyright (C) 2026 LumaShot contributors
+Project: https://github.com/glin93/LumaShot
+
+LumaShot-authored code is licensed under GPL-3.0-only (see LICENSE).
+This notice does not relicense third-party components.
+
+backend/siwc contains OpenAI Sign in with ChatGPT DevKit source under its
+Noncommercial License. It is an optional installer component, disabled by
+default. Its original license, notices and modification notices are retained.
+
+ShareX is invoked as a separate, unmodified process. LumaShot applies its icon
+and editor-window caption at runtime to its own child process only. Upstream
+executable bytes, copyright notices, licenses and About information are intact.
+
+See THIRD_PARTY.md and SOURCES.md for versions, licenses and source locations.

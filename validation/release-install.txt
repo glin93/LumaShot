@@ -1,0 +1,7 @@
+PASS core-only installation completes without backend/siwc/dist/index.js; all 21 backend checks pass in the installed directory
+PASS explicit optional-component installation completes with DevKit present; all 21 backend checks and inline-image validation pass in the installed directory
+PASS silent optional installation without license acceptance exits with code 7 before application files are installed
+PASS installer main-file exclusions preserve nested dependency data directories
+PASS unused tools/ffmpeg.exe is excluded from the final installer
+PASS live editor window displays the LumaShot icon and caption; cancellation returns to the unchanged six-record synthetic library and the application exits normally
+NOTE network inference uses mocks; no real AI credentials or user captures are included in these checks

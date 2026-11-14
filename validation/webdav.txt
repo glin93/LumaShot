@@ -1,0 +1,2 @@
+PASS real rclone upload/download over local WebDAV
+PASS platform shortcuts and audio settings roundtrip through production transfer filters; partial files excluded

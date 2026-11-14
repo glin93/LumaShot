@@ -1,0 +1,5 @@
+PASS ShareX ActiveWindow -> inbox -> persistent library
+PASS import deduplication survives restart
+PASS engine preserves clipboard; app copies image data compatible with Ctrl+V
+PASS FFmpeg encoding and video history thumbnail
+PASS MP4 to GIF export

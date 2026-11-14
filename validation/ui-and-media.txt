@@ -1,0 +1,10 @@
+PASS left floating rail renders three independent thumbnails with copy/edit/dismiss controls
+PASS Ctrl+Shift+H opens the top horizontal quick history with search and library entry
+PASS updated independent rounded thumbnails show blurred hover overlay, copy/save pills and corner actions; quick history uses a rounded floating panel without native scrollbars (live UI inspection)
+PASS image preview displays the full synthetic 1000x650 image in a rounded frameless window with one close control and no scrollbars (live UI inspection)
+PASS clicking Edit in preview closes the preview and opens the same synthetic image in the ShareX image editor; Escape exits the editor without adding a record
+PASS cancelled standalone editor exits its dedicated ShareX host and allows reopening; rectangle annotation + Ctrl+S + close creates one changed image with ParentId, preserves original SHA-256, and exits the editor process
+PASS screenshot/recording settings show image-copy on, video-copy off, microphone off, system audio on; UI Save persisted all six values
+PASS shortcut settings show six capture actions plus quick history/library, platform selector and reachable Save/Restore controls
+PASS window/fullscreen recordings inspected with FFmpeg: 2.01 seconds, 2880x1800 H.264 video and 48kHz stereo AAC audio stream
+LIMIT microphone content, multi-monitor behavior, third-party account authorization, other annotation tools and scroll capture workflows need further live acceptance

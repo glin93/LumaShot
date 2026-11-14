@@ -1,0 +1,2 @@
+PASS ScreenRecorderActiveWindow records fixture and creates playable video history (microphone off, system audio on)
+PASS ScreenRecorderCustomRegion records fixture and creates playable video history (microphone off, system audio on)

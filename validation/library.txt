@@ -1,0 +1,12 @@
+PASS persistence and favorites
+PASS title/tag/note search and favorites filter
+PASS reversible trash and original preservation
+PASS every edit creates a new file and record linked to its immutable original
+PASS corrupt index recovers from backup
+PASS library path traversal rejected
+PASS bounded thumbnails
+PASS backup restore and duplicate merge
+PASS unsafe backup paths rejected
+PASS microphone off, system audio on; image copy on, video copy off; auto-open off
+PASS eight unique platform shortcuts and media/audio settings survive restart
+PASS duplicate shortcuts rejected before registration

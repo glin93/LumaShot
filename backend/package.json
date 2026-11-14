@@ -1,0 +1,13 @@
+{
+  "name": "lumashot-local-backend",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.5.2",
+    "@napi-rs/keyring": "2.1.2",
+    "jose": "6.2.12",
+    "openai": "7.21.0",
+    "proper-lockfile": "4.1.2"
+  },
+  "version": "0.1.0",
+  "private": true
+}

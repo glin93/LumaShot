@@ -1,0 +1,5 @@
+PASS reverse-enumerated 12-image burst is archived chronologically; rail fits working area; all files retained; clipboard pixels match newest capture
+PASS capacity follows available height: five cards at 820, nine at 1450 logical pixels
+PASS AI action absent without active profile/model or optional component, present in rail and quick history with configured model, absent after removal; no AI requests sent
+PASS 20 overlapping image copy requests supersede a busy stale writer; clipboard pixels match final request
+PASS custom icon loads from executable for window and tray

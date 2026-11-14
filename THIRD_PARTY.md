@@ -2,6 +2,9 @@
 
 | 组件 | 版本 / 来源 | 许可及用途 |
 | --- | --- | --- |
+| .NET apphost | Microsoft.NETCore.App.Host.win-x64 10.0.14，微软官方 NuGet 包 | MIT，常驻截图进程启动器；许可及第三方声明见 licenses/dotnet-apphost-* |
+| MdXaml / MdXaml.Plugins | [1.27.0](https://github.com/whistyun/MdXaml) | MIT，AI 回答 Markdown 排版；许可见 licenses/MdXaml-MIT.txt |
+| AvalonEdit | [6.3.0.90](https://github.com/icsharpcode/AvalonEdit) | MIT，MdXaml 文本渲染依赖；许可见 licenses/AvalonEdit-MIT.txt |
 | ShareX | [v22.4.0](https://github.com/ShareX/ShareX/releases/tag/v22.4.0)，官方 portable-x64 ZIP | GPL-3.0，未修改独立进程；[对应源码](https://github.com/ShareX/ShareX/tree/v22.4.0)，完整附带许可在 engine/Licenses |
 | FFmpeg | ShareX 便携包自带 `n9.0.2-48-gd4070a14ce-20261107` | 此构建启用 GPL/version3，许可在 engine/Licenses/FFmpeg_license.txt；[FFmpeg 源码](https://git.ffmpeg.org/gitweb/ffmpeg.git/commit/d4070a14ce)、[Windows 构建项目](https://github.com/BtbN/FFmpeg-Builds) |
 | Node.js | [v24.22.3 Windows x64](https://nodejs.org/dist/v24.22.3/) | runtime/LICENSE.txt，包含其第三方通知 |

@@ -36,6 +36,11 @@ namespace LumaShot {
    var writes=new List<Task>{stale};for(byte i=20;i<40;i++)writes.Add(Images.Copy(SurfaceChecks.ColorImage(i)));await Task.WhenAll(writes);
    SurfaceChecks.Require(staleAttempts==1&&await SurfaceChecks.ClipboardRed()==39,"old retries must not overwrite newest image");results.Add("PASS 20 overlapping image copy requests supersede a busy stale writer; clipboard pixels match final request");
    SurfaceChecks.Require(Window.Icon!=null&&tray.Icon!=null,"window/tray icons");using(var icon=System.Drawing.Icon.ExtractAssociatedIcon(System.Reflection.Assembly.GetExecutingAssembly().Location)){SurfaceChecks.Require(icon!=null,"embedded executable icon");}results.Add("PASS custom icon loads from executable for window and tray");
+   ToggleQuickHistory();SurfaceChecks.Require(quickHistory.IsVisible&&captureRail.IsVisible,"surface fixture visible");capturing=true;
+   var clock=System.Diagnostics.Stopwatch.StartNew();await PrepareCaptureSurfaces();clock.Stop();
+   SurfaceChecks.Require(!captureRail.IsVisible&&quickHistory.IsVisible&&Window.IsVisible,"only automatic preview thumbnails should be hidden");
+   results.Add("PASS capture preparation hides only automatic previews; library and quick history stay visible; compositor wait "+clock.ElapsedMilliseconds+" ms (no fixed 250 ms delay)");
+   capturing=false;ResumeSurfaces();HideQuickHistory();SurfaceChecks.Require(captureRail.IsVisible,"previews return after capture");
   }
   internal void FinishSurfaceCheck(){Exit();}
  }

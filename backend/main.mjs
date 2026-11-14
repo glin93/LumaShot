@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {devNull} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
 import {randomUUID,createHash} from 'node:crypto';
@@ -12,7 +11,7 @@ import {run} from './process.mjs';
 import {inspectMedia,prepareMedia} from './media.mjs';
 import {SyncStore} from './sync.mjs';
 import {PreferenceSync} from './preferences.mjs';
-import {parseDriveAuthorization,syncFilters} from './cloud.mjs';
+import {parseDriveAuthorization,syncFilters,rcloneConfigPath} from './cloud.mjs';
 const base=path.resolve(fileURLToPath(new URL('..',import.meta.url)));
 const root=path.resolve(process.argv[2]);
 const vault=path.resolve(process.argv[3]);
@@ -63,7 +62,7 @@ function remoteEnv(remote){
 }
 const rclone=path.join(base,'sync-tools',executable('rclone'));
 async function transfer(remote,from,to,signal){
-  const r=await run(rclone,['copy',from,to,'--config',devNull,'--ignore-existing',...syncFilters,'--retries','2','--low-level-retries','2','--transfers','2','--checkers','2','--timeout','60s','--contimeout','20s'],{env:remoteEnv(remote),signal,timeout:300000});
+  const r=await run(rclone,['copy',from,to,'--config',rcloneConfigPath,'--ignore-existing',...syncFilters,'--retries','2','--low-level-retries','2','--transfers','2','--checkers','2','--timeout','60s','--contimeout','20s'],{env:remoteEnv(remote),signal,timeout:300000});
   if(r.code!==0)throw new Error('同步连接失败（rclone '+r.code+'）。已保留本地资料；请检查网络、账号和目录权限。');
 }
 async function handle(m,signal){
@@ -128,12 +127,12 @@ async function handle(m,signal){
    if(syncBusy)throw new Error('请等待同步结束。');const u=new URL(m.url);if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash)throw new Error('请输入不含凭证和查询参数的 HTTPS WebDAV 地址。');
    const obscure=await run(rclone,['obscure','-'],{input:String(m.password||'')+'\n',signal});if(obscure.code!==0)throw new Error('无法保护 WebDAV 密码。');
    const p={id:randomUUID(),type:'webdav',name:'WebDAV',url:u.href,user:String(m.user||''),password:obscure.out.trim(),enabled:true};
-   const check=await run(rclone,['lsd','lumasync:','--config',devNull,'--max-depth','1','--timeout','20s'],{env:remoteEnv(p),signal,timeout:40000});if(check.code!==0)throw new Error('WebDAV 连接失败。请检查地址、用户名和应用密码。');
+   const check=await run(rclone,['lsd','lumasync:','--config',rcloneConfigPath,'--max-depth','1','--timeout','20s'],{env:remoteEnv(p),signal,timeout:40000});if(check.code!==0)throw new Error('WebDAV 连接失败。请检查地址、用户名和应用密码。');
    state.sync.push(p);await save();return safeState();
   }
   case 'addDrive':{
    if(syncBusy||authBusy)throw new Error('请等待当前连接完成。');authBusy=true;
-   try{const config=Buffer.from(JSON.stringify({scope:'drive.file'})).toString('base64').replace(/=+$/,'');const r=await run(rclone,['authorize','drive',config,'--config',devNull],{timeout:300000,signal});
+   try{const config=Buffer.from(JSON.stringify({scope:'drive.file'})).toString('base64').replace(/=+$/,'');const r=await run(rclone,['authorize','drive',config,'--config',rcloneConfigPath],{timeout:300000,signal});
     if(r.code!==0)throw new Error('Google Drive 授权未完成。');const token=parseDriveAuthorization(r.out);
     state.sync.push({id:randomUUID(),type:'drive',name:'Google Drive',token,enabled:true});await save();return safeState();
    }finally{authBusy=false;}
@@ -147,7 +146,7 @@ async function handle(m,signal){
     await preferenceSync.publish(m.preferences||{});
     for(const remote of remotes){
       // Create only the application directory; never delete remote or local captures.
-      const init=await run(rclone,['mkdir','lumasync:LumaShot','--config',devNull],{env:remoteEnv(remote),signal,timeout:60000});if(init.code!==0)throw new Error('无法创建同步目录。');
+      const init=await run(rclone,['mkdir','lumasync:LumaShot','--config',rcloneConfigPath],{env:remoteEnv(remote),signal,timeout:60000});if(init.code!==0)throw new Error('无法创建同步目录。');
       await transfer(remote,'lumasync:LumaShot',syncStore.dir,signal);
     }
     const records=await syncStore.merge();
@@ -175,7 +174,7 @@ const lines=createInterface({input:process.stdin,crlfDelay:Infinity});
 lines.on('line',line=>{
  if(line.length>32*1024*1024)return;
  let m;try{m=JSON.parse(line);}catch{return;}
- if(m.method==='cancel'){requests.get(m.target)?.abort();chatgpt.cancelSignIn();send({requestId:m.requestId,result:{cancelled:true}});return;}
+ if(m.method==='cancel'){requests.get(m.target)?.abort();chatgpt.cancelSignIn?.();send({requestId:m.requestId,result:{cancelled:true}});return;}
  const controller=new AbortController();requests.set(m.requestId,controller);
  // Serialize all configuration writes; ask/sync/cancel remain independently cancellable.
  const operation=()=>handle(m,controller.signal);

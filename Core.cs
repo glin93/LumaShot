@@ -78,6 +78,7 @@ namespace LumaShot {
   [DllImport("user32.dll")]public static extern bool RegisterHotKey(IntPtr h,int id,uint mods,uint key);
   [DllImport("user32.dll")]public static extern bool UnregisterHotKey(IntPtr h,int id);
   [DllImport("user32.dll")]public static extern bool SetProcessDPIAware();
+  [DllImport("dwmapi.dll")]public static extern int DwmFlush();
  }
  public static class Video {
   public static string Exe {get{return Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"engine","ffmpeg.exe");}}

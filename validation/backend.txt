@@ -14,6 +14,7 @@ PASS cross-platform credential envelope roundtrip and tamper rejection (Keychain
 PASS rclone legacy and encoded OAuth result parsing
 PASS duration/bitrate inspection, timestamped frames, temporary cleanup
 PASS optional ChatGPT component is reported accurately; missing component cannot start login
+PASS cancel leaves the backend available with or without the optional ChatGPT component
 PASS multiple encrypted profiles, exactly one active, manual model choice, no key in IPC
 PASS OpenAI image request and streaming completed response via mock transport
 PASS single provider routing and Gemini image request via mock transport

@@ -8,6 +8,7 @@ backend/node_modules/
 backend/siwc/dist/
 backend/SecureStore.exe
 *.exe
+*.dll
 *.pdb
 *.dpapi
 *.tmp

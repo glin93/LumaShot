@@ -1,0 +1,4 @@
+PASS three consecutive untitled-selector cancellations close the idle host and release capture state
+PASS untitled visible selector stays open; closing it then releases the host
+PASS cancellation before the first window poll recovers after startup grace
+PASS nonzero engine exit releases state and the next task succeeds

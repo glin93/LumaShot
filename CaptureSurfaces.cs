@@ -20,7 +20,7 @@ namespace LumaShot {
   DateTime latestAutomaticCopy=DateTime.MinValue;
   internal static void FitCaptureCards(List<string> cards,Func<string,double> height,double available){double total=12+cards.Sum(height);while(cards.Count>1&&total>available){total-=height(cards[0]);cards.RemoveAt(0);}}
   Rect PointerWorkArea(){var area=F.Screen.FromPoint(F.Cursor.Position).WorkingArea;var source=PresentationSource.FromVisual(Window);var matrix=source!=null&&source.CompositionTarget!=null?source.CompositionTarget.TransformFromDevice:Matrix.Identity;var a=matrix.Transform(new Point(area.Left,area.Top));var b=matrix.Transform(new Point(area.Right,area.Bottom));return new Rect(a,b);}
-  Window Surface(string title,bool activate){return new Window{Title=title,WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,AllowsTransparency=true,Background=Brushes.Transparent,ShowInTaskbar=false,Topmost=true,ShowActivated=activate,WindowStartupLocation=WindowStartupLocation.Manual,FontFamily=Window.FontFamily,Resources=Window.Resources};}
+  Window Surface(string title,bool activate){return new Window{Title=title,WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,AllowsTransparency=true,Background=Brushes.Transparent,ShowInTaskbar=demo,Topmost=true,ShowActivated=activate,WindowStartupLocation=WindowStartupLocation.Manual,FontFamily=Window.FontFamily,FontSize=13,Foreground=B("#303247"),UseLayoutRounding=true,Resources=Window.Resources};}
   Border SurfaceFrame(UIElement content){return new Border{Background=B("#FCFCFF"),CornerRadius=new CornerRadius(20),BorderBrush=B("#E9E5EF"),BorderThickness=new Thickness(1),Padding=new Thickness(12),Margin=new Thickness(7),Effect=new DropShadowEffect{Color=Color.FromRgb(32,23,61),Opacity=.17,BlurRadius=14,ShadowDepth=3},Child=content};}
   Button SurfaceButton(string label,string tip,Action action){var b=Small(label,action);b.ToolTip=tip;b.Padding=new Thickness(9,5,9,5);b.FontSize=11;return b;}
   void EnsureRail(){
@@ -76,7 +76,7 @@ namespace LumaShot {
    quickSearch=new TextBox{Width=250,Height=33,FontSize=12,ToolTip="搜索截图",Margin=new Thickness(10,0,12,0)};DockPanel.SetDock(quickSearch,Dock.Right);header.Children.Add(quickSearch);quickCount=T("快速历史",14,"#4C465D");quickCount.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(quickCount);DockPanel.SetDock(header,Dock.Top);dock.Children.Add(header);
    quickItems=new StackPanel{Orientation=Orientation.Horizontal};quickScroll=new ScrollViewer{Content=quickItems,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,0,7)};quickScroll.PreviewMouseWheel+=(s,e)=>{quickScroll.ScrollToHorizontalOffset(quickScroll.HorizontalOffset-e.Delta*2);e.Handled=true;};dock.Children.Add(quickScroll);quickHistory.Content=SurfaceFrame(dock);
    var debounce=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(140)};debounce.Tick+=(s,e)=>{debounce.Stop();quickSelectionId=null;RenderQuickHistory();quickScroll.ScrollToLeftEnd();};quickSearch.TextChanged+=(s,e)=>{debounce.Stop();debounce.Start();};
-   quickHistory.Deactivated+=(s,e)=>{if(!quickItems.Children.OfType<FrameworkElement>().Any(x=>x.ContextMenu!=null&&x.ContextMenu.IsOpen))HideQuickHistory();};
+   quickHistory.Deactivated+=(s,e)=>{if(!capturing&&!quickItems.Children.OfType<FrameworkElement>().Any(x=>x.ContextMenu!=null&&x.ContextMenu.IsOpen))HideQuickHistory();};
    quickHistory.Closing+=(s,e)=>{if(!quitting){e.Cancel=true;quickHistory.Hide();}};
    quickHistory.PreviewKeyDown+=async(s,e)=>{if(e.Key==Key.Escape){HideQuickHistory();e.Handled=true;return;}if(quickResults.Count==0)return;
     if(e.Key==Key.Enter){await CopyShot(quickResults[quickSelected]);HideQuickHistory();e.Handled=true;}
@@ -87,7 +87,8 @@ namespace LumaShot {
   void RenderQuickHistory(){if(quickHistory==null)return;quickResults=lib.Query("all",quickSearch.Text,false).Take(160).ToList();quickSelected=Math.Max(0,quickResults.FindIndex(x=>x.Id==quickSelectionId));quickSelectionId=quickResults.Count==0?null:quickResults[quickSelected].Id;quickItems.Children.Clear();quickCount.Text="快速历史  ·  "+quickResults.Count;foreach(var shot in quickResults)quickItems.Children.Add(FloatingCard(shot,true));if(quickResults.Count==0)quickItems.Children.Add(new TextBlock{Text="没有匹配的截图",Margin=new Thickness(30,50,30,30),Foreground=B("#9993A7")});}
   void ToggleQuickHistory(){if(capturing||engine.Busy)return;EnsureQuickHistory();if(quickHistory.IsVisible){HideQuickHistory();return;}var area=PointerWorkArea();quickHistory.Width=Math.Min(1080,Math.Max(360,area.Width-40));quickHistory.Left=area.Left+(area.Width-quickHistory.Width)/2;quickHistory.Top=area.Top+10;quickSearch.Text="";quickSelectionId=null;RenderQuickHistory();quickHistory.Show();quickHistory.Activate();quickSearch.Focus();quickScroll.ScrollToLeftEnd();}
   void HideQuickHistory(){if(quickHistory!=null)quickHistory.Hide();}
-  void SuspendSurfaces(){surfacesSuspended=true;if(captureRail!=null)captureRail.Hide();HideQuickHistory();}
+  void SuspendSurfaces(){surfacesSuspended=true;if(captureRail!=null)captureRail.Hide();}
+  async Task PrepareCaptureSurfaces(){bool hadPreview=captureRail!=null&&captureRail.IsVisible;SuspendSurfaces();if(hadPreview){int result=await Task.Run(()=>Native.DwmFlush());if(result<0)await Task.Delay(32);}}
   void ResumeSurfaces(){surfacesSuspended=false;RenderRail();}
   void CloseSurfaces(){if(captureRail!=null)captureRail.Close();if(quickHistory!=null)quickHistory.Close();}
   async Task AfterCapture(Shot shot){AddCaptureCard(shot);string kind=shot.Kind=="image"?"image":"video";if(preferences.CaptureCopy(kind)&&shot.Date>=latestAutomaticCopy){latestAutomaticCopy=shot.Date;await CopyShot(shot);}string open=preferences.CaptureOpen(kind);if(open=="library")OpenInLibrary(shot);else if(open=="folder")OpenLocation(shot);}
@@ -96,6 +97,7 @@ namespace LumaShot {
  public static class CaptureClipboard {
   static readonly SemaphoreSlim gate=new SemaphoreSlim(1,1);static long generation;
   public static async Task Set(Action write){long request=Interlocked.Increment(ref generation);await gate.WaitAsync();try{Exception error=null;bool written=false;for(int i=0;i<10;i++){if(request!=Interlocked.Read(ref generation))return;try{if(!written){write();written=true;}else{Clipboard.Flush();return;}}catch(System.Runtime.InteropServices.COMException e){error=e;}await Task.Delay(100);}throw new IOException("剪贴板暂时被占用，请重试。",error);}finally{gate.Release();}}
+  public static Task CopyText(string text){var data=new DataObject(DataFormats.UnicodeText,text);return Set(()=>Clipboard.SetDataObject(data,false));}
   public static async Task Copy(Library lib,Shot shot){if(shot.Kind=="image")await Images.Copy(Images.Load(lib.Full(shot.File)));else{var paths=new System.Collections.Specialized.StringCollection();paths.Add(lib.Full(shot.File));var data=new DataObject();data.SetFileDropList(paths);await Set(()=>Clipboard.SetDataObject(data,false));}}
  }
 }

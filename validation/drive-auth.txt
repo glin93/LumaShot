@@ -1,0 +1,2 @@
+PASS bundled rclone accepts the shared production empty-config path
+PASS Drive OAuth listener starts and redirects to Google with drive.file scope and loopback callback; no browser or account login used

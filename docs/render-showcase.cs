@@ -67,6 +67,19 @@ namespace LumaShot {
    Place(historyBoard,Frame(new Image{Source=Demo.Image(1),Stretch=Stretch.Uniform},1040,625),280,172);
    Place(historyBoard,new Image{Source=historyImage,Width=1456,Height=320,Stretch=Stretch.Fill},72,142);
    SaveBoard(historyBoard,Path.Combine(output,"quick-history.png"));
+
+   var settingsLayout=new Grid{Background=B("#F6F7FB"),Resources=Window.Resources};TextElement.SetFontFamily(settingsLayout,Window.FontFamily);
+   settingsLayout.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(200)});settingsLayout.ColumnDefinitions.Add(new ColumnDefinition());
+   var navigation=new StackPanel{Margin=new Thickness(20,26,16,20)};navigation.Children.Add(PageHeader("设置",null));
+   foreach(string label in new[]{"截图与录屏","快捷键","AI 服务","云同步","资料库","关于"}){var item=new Border{CornerRadius=new CornerRadius(8),Background=B(label=="截图与录屏"?"#EAE6F8":"#F6F7FB"),Padding=new Thickness(16,14,16,14),Margin=new Thickness(0,0,0,6),Child=T(label,14,label=="截图与录屏"?"#7057CF":"#55596B")};navigation.Children.Add(item);}settingsLayout.Children.Add(navigation);
+   var settingsContent=new Border{Padding=new Thickness(24,26,28,20),Child=CapturePage()};Grid.SetColumn(settingsContent,1);settingsLayout.Children.Add(settingsContent);
+   var settingsBoard=Board("Settings / 设置",1000);Place(settingsBoard,Frame(new Image{Source=Snapshot(settingsLayout,980,780),Stretch=Stretch.Uniform},1050,836),275,130);SaveBoard(settingsBoard,Path.Combine(output,"settings.png"));
+
+   var conversation=new DockPanel{Background=B("#F6F7FB"),Margin=new Thickness(24),Resources=Window.Resources};TextElement.SetFontFamily(conversation,Window.FontFamily);
+   var askHeading=PageHeader("Ask AI","工作台 · 本周数据概览");DockPanel.SetDock(askHeading,Dock.Top);conversation.Children.Add(askHeading);
+   var composer=new Border{CornerRadius=new CornerRadius(13),Background=Brushes.White,BorderBrush=B("#DCDDE8"),BorderThickness=new Thickness(1),Padding=new Thickness(18),Height=120,Margin=new Thickness(0,12,0,0)};var composerBody=new DockPanel();var send=Btn("发送  ↑",()=>{},true);send.HorizontalAlignment=HorizontalAlignment.Right;DockPanel.SetDock(send,Dock.Bottom);composerBody.Children.Add(send);composerBody.Children.Add(T("继续追问…",14,"#9398AA"));composer.Child=composerBody;DockPanel.SetDock(composer,Dock.Bottom);conversation.Children.Add(composer);
+   var answer=new StackPanel();answer.Children.Add(ChatMessage("user","你","帮我总结这个页面，有哪些值得保留的设计？"));answer.Children.Add(ChatMessage("assistant","AI","### 清晰的信息层级\n\n重点数据和图表一目了然。\n\n- **信息层级**：标题、关键数据和图表各有明确的位置。\n- **颜色使用**：紫色用于强调重点，其余区域保持简洁。\n- **布局节奏**：卡片间距一致，阅读顺畅。\n\n建议补充数据的时间范围，方便比较不同周期。"));conversation.Children.Add(answer);
+   var askBoard=Board("Ask AI / 截图对话",1000);Place(askBoard,Frame(new Image{Source=Snapshot(new Border{Child=conversation},820,740),Stretch=Stretch.Uniform},930,840),335,130);SaveBoard(askBoard,Path.Combine(output,"ask-ai.png"));
    appIcon.Dispose();quitting=true;quickHistory.Close();Window.Close();Application.Current.Shutdown();
   }
  }

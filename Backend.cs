@@ -12,7 +12,7 @@ namespace LumaShot {
  public class Backend:IDisposable {
   public static JavaScriptSerializer Json(){return new JavaScriptSerializer{MaxJsonLength=64*1024*1024,RecursionLimit=100};}
   class Pending { public TaskCompletionSource<Dictionary<string,object>> Task=new TaskCompletionSource<Dictionary<string,object>>(); public Action<string> Delta; }
-  Process process;Dictionary<string,Pending> pending=new Dictionary<string,Pending>();object gate=new object();public event Action<string> Browser;
+  Process process;StreamWriter input;Dictionary<string,Pending> pending=new Dictionary<string,Pending>();object gate=new object();public event Action<string> Browser;
   public string Vault;
   public static string VaultPath(string root){
    string id;using(var hash=SHA256.Create())id=BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(root).ToLowerInvariant()))).Replace("-","").Substring(0,20);
@@ -25,7 +25,7 @@ namespace LumaShot {
    process.StartInfo.EnvironmentVariables.Remove("OPENAI_LOG");process.StartInfo.EnvironmentVariables.Remove("OPENAI_CUSTOM_HEADERS");
    process.OutputDataReceived+=(s,e)=>{if(e.Data!=null)Receive(e.Data);};process.ErrorDataReceived+=(s,e)=>{};
    process.Exited+=(s,e)=>FailAll("后台连接已退出，请重新启动应用。");
-   process.Start();process.StandardInput.NewLine="\n";process.BeginOutputReadLine();process.BeginErrorReadLine();
+   process.Start();input=new StreamWriter(process.StandardInput.BaseStream,new UTF8Encoding(false)){NewLine="\n",AutoFlush=true};process.BeginOutputReadLine();process.BeginErrorReadLine();
   }
   void Receive(string line){try{
    var m=Json().Deserialize<Dictionary<string,object>>(line);
@@ -38,11 +38,11 @@ namespace LumaShot {
   void FailAll(string message){lock(gate){foreach(var p in pending.Values)p.Task.TrySetException(new IOException(message));pending.Clear();}}
   public Task<Dictionary<string,object>> Call(string method,Dictionary<string,object> args=null,Action<string> delta=null,string requestId=null){
    var data=args??new Dictionary<string,object>();string id=requestId??Guid.NewGuid().ToString("N");data["method"]=method;data["requestId"]=id;var p=new Pending{Delta=delta};
-   lock(gate){if(process.HasExited)throw new IOException("后台连接已退出，请重新启动应用。");pending.Add(id,p);try{process.StandardInput.WriteLine(Json().Serialize(data));process.StandardInput.Flush();}catch{pending.Remove(id);throw;}}return p.Task.Task;
+   lock(gate){if(process.HasExited)throw new IOException("后台连接已退出，请重新启动应用。");pending.Add(id,p);try{input.WriteLine(Json().Serialize(data));}catch{pending.Remove(id);throw;}}return p.Task.Task;
   }
   public async Task Cancel(string id){await Call("cancel",new Dictionary<string,object>{{"target",id}});}
   public static string S(Dictionary<string,object> d,string key){object v;return d!=null&&d.TryGetValue(key,out v)&&v!=null?Convert.ToString(v):"";}
   public static List<Dictionary<string,object>> Rows(Dictionary<string,object> d,string key){object v;if(!d.TryGetValue(key,out v)||v==null)return new List<Dictionary<string,object>>();return Json().ConvertToType<List<Dictionary<string,object>>>(v);}
-  public void Dispose(){try{process.StandardInput.Close();if(!process.WaitForExit(2000))process.Kill();process.Dispose();}catch{}FailAll("应用已退出。");}
+  public void Dispose(){try{input.Close();if(!process.WaitForExit(2000))process.Kill();process.Dispose();}catch{}FailAll("应用已退出。");}
  }
 }

@@ -25,7 +25,7 @@ namespace LumaShot {
  }
  public static class Tests {
   public static void SurfaceSmoke(string root){
-   Directory.CreateDirectory(root);var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};var ui=new MainUI(new Library(root),false);var results=new List<string>();ui.Window.Loaded+=async(s,e)=>{try{await ui.CheckCaptureSurfaces(results);File.WriteAllLines(Path.Combine(root,"surface-test-results.txt"),results);Environment.ExitCode=0;}catch(Exception ex){File.WriteAllText(Path.Combine(root,"surface-test-error.txt"),ex.ToString());Environment.ExitCode=1;}finally{ui.FinishSurfaceCheck();}};app.Run(ui.Window);
+   Directory.CreateDirectory(root);var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};var ui=new MainUI(new Library(root),true);var results=new List<string>();ui.Window.Loaded+=async(s,e)=>{try{await ui.CheckCaptureSurfaces(results);File.WriteAllLines(Path.Combine(root,"surface-test-results.txt"),results);Environment.ExitCode=0;}catch(Exception ex){File.WriteAllText(Path.Combine(root,"surface-test-error.txt"),ex.ToString());Environment.ExitCode=1;}finally{ui.FinishSurfaceCheck();}};app.Run(ui.Window);
   }
   static void Assert(bool b,string m){if(!b)throw new Exception("FAIL: "+m);}
   public static void Run(string root){
@@ -50,9 +50,9 @@ namespace LumaShot {
   public static void RecordingSmoke(string root){
    Directory.CreateDirectory(root);var app=new Application();var engine=new CaptureEngine(root);var results=new List<string>();var bounds=System.Windows.Forms.SystemInformation.VirtualScreen;
    var w=new Window{Title="LumaShot recording test fixture",WindowStyle=WindowStyle.None,Topmost=true,WindowState=WindowState.Maximized,Content=new Image{Source=Demo.Image(1),Stretch=Stretch.Fill}};
-   w.Loaded+=async(s,e)=>{try{await Task.Delay(800);foreach(var action in new[]{"ScreenRecorderActiveWindow","ScreenRecorderCustomRegion"}){w.Activate();var known=new HashSet<string>(Directory.GetFiles(engine.Inbox,"*.mp4",SearchOption.AllDirectories));var task=engine.Run(action,null,2);if(await Task.WhenAny(task,Task.Delay(45000))!=task){if(engine.Busy)engine.Running.Kill();throw new IOException("Recording did not finish: "+action);}await task;var file=Directory.GetFiles(engine.Inbox,"*.mp4",SearchOption.AllDirectories).FirstOrDefault(x=>!known.Contains(x));Assert(file!=null&&new FileInfo(file).Length>1000,"recording saved: "+action);var library=new Library(root);var shot=await engine.Import(library,file,true);Assert(shot.Kind=="video"&&shot.Width>400,"recording import");results.Add("PASS "+action+" records fixture and creates playable video history (microphone off, system audio on)");}
+   w.Loaded+=async(s,e)=>{try{await engine.WarmUp();await Task.Delay(800);foreach(var action in new[]{"ScreenRecorderActiveWindow","ScreenRecorderCustomRegion"}){w.Activate();var known=new HashSet<string>(Directory.GetFiles(engine.Inbox,"*.mp4",SearchOption.AllDirectories));var task=engine.Run(action,null,2);if(await Task.WhenAny(task,Task.Delay(45000))!=task){if(engine.Busy)engine.Running.Kill();throw new IOException("Recording did not finish: "+action);}await task;var file=Directory.GetFiles(engine.Inbox,"*.mp4",SearchOption.AllDirectories).FirstOrDefault(x=>!known.Contains(x));Assert(file!=null&&new FileInfo(file).Length>1000,"recording saved: "+action);var library=new Library(root);var shot=await engine.Import(library,file,true);Assert(shot.Kind=="video"&&shot.Width>400,"recording import");results.Add("PASS "+action+" records fixture and creates playable video history (microphone off, system audio on)");}
     File.WriteAllLines(Path.Combine(root,"recording-test-results.txt"),results);Environment.ExitCode=0;
-   }catch(Exception error){File.WriteAllText(Path.Combine(root,"recording-test-error.txt"),error.ToString());Environment.ExitCode=1;}finally{w.Close();app.Shutdown();}};app.Run(w);
+   }catch(Exception error){File.WriteAllText(Path.Combine(root,"recording-test-error.txt"),error.ToString());Environment.ExitCode=1;}finally{engine.Dispose();w.Close();app.Shutdown();}};app.Run(w);
   }
   public static void EngineSmoke(string root){
    Directory.CreateDirectory(root);var app=new Application();var results=new List<string>();var lib=new Library(root);var engine=new CaptureEngine(root);
@@ -62,7 +62,7 @@ namespace LumaShot {
     Assert(Clipboard.ContainsText()&&Clipboard.GetText()=="LumaShot clipboard preservation test","engine must not copy unconditionally");await CaptureClipboard.Copy(lib,x);Assert(Clipboard.ContainsImage(),"capture clipboard image");results.Add("PASS engine preserves clipboard; app copies image data compatible with Ctrl+V");
     string video=Path.Combine(root,"sample.mp4");var p=Video.Start("-y -f lavfi -i color=c=0x7561df:s=320x240:r=10 -t 1 -c:v libx264 -pix_fmt yuv420p \""+video+"\"");await Task.Run(()=>p.WaitForExit());Assert(p.ExitCode==0,"video encode");p.Dispose();var rec=await engine.Import(lib,video,true);Assert(rec.Kind=="video"&&File.Exists(lib.Full(rec.Thumb)),"video import");results.Add("PASS FFmpeg encoding and video history thumbnail");string gif=Path.Combine(root,"sample.gif");await Video.ConvertGif(video,gif);Assert(File.ReadAllBytes(gif).Take(3).SequenceEqual(new byte[]{71,73,70}),"GIF format");results.Add("PASS MP4 to GIF export");
     File.WriteAllLines(Path.Combine(root,"engine-test-results.txt"),results);Environment.ExitCode=0;
-   }catch(Exception ex){File.WriteAllText(Path.Combine(root,"engine-test-error.txt"),ex.ToString());Environment.ExitCode=1;}finally{w.Close();app.Shutdown();}};app.Run(w);
+   }catch(Exception ex){File.WriteAllText(Path.Combine(root,"engine-test-error.txt"),ex.ToString());Environment.ExitCode=1;}finally{engine.Dispose();w.Close();app.Shutdown();}};app.Run(w);
   }
  }
 }

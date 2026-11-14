@@ -4,7 +4,7 @@
 [Setup]
 AppId={{E5808125-1FD8-4B6C-8568-03B55559D677}
 AppName=LumaShot
-AppVersion=0.1.0
+AppVersion=0.1.1
 AppPublisher=glin93
 AppPublisherURL=https://github.com/glin93/LumaShot
 AppSupportURL=https://github.com/glin93/LumaShot/issues
@@ -17,7 +17,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19045
 OutputDir=..\release
-OutputBaseFilename=LumaShot-0.1.0-Setup-x64
+OutputBaseFilename=LumaShot-0.1.1-Setup-x64
 SetupIconFile={#AppSource}\LumaShot.ico
 UninstallDisplayIcon={app}\LumaShot.exe
 LicenseFile={#AppSource}\LICENSE
@@ -46,7 +46,7 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: unchecked
 
 [Files]
 Source: "{#AppSource}\backend\siwc\LICENSE"; DestName: "chatgpt-license.txt"; Flags: dontcopy
-Source: "{#AppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: main; Excludes: "\backend\siwc\*,\engine\ShareX\*,\tools\*,\.git\*,\.build-cache\*,\Data\*,\test-output\*,*.dpapi,*.tmp"
+Source: "{#AppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: main; Excludes: "\LumaShot.Check.exe,\backend\siwc\*,\engine\ShareX\*,\tools\*,\.git\*,\.build-cache\*,\Data\*,\test-output\*,*.dpapi,*.tmp"
 Source: "{#AppSource}\backend\siwc\*"; DestDir: "{app}\backend\siwc"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: chatgpt
 
 [Icons]

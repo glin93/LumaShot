@@ -1,3 +1,6 @@
+import {devNull} from 'node:os';
+// rclone rejects Node's Windows device path (\\.\nul) during config-path cleanup.
+export const rcloneConfigPath=process.platform==='win32'?'NUL':devNull;
 export const syncFilters=['--filter','- *.tmp','--filter','+ /objects/**','--filter','+ /revisions/**','--filter','+ /settings/**','--filter','+ /[a-f0-9]*','--filter','- **'];
 // rclone authorize emits either a JSON token or a base64 encoded config map.
 export function parseDriveAuthorization(output){

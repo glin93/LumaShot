@@ -1,0 +1,6 @@
+PASS Chinese/Latin text fits library, quick history and WebDAV input heights (33/34/40/44 DIP)
+PASS ChatGPT status distinguishes connected account, signed-out state and reauthentication
+PASS additional account entry is collapsed until explicitly expanded
+PASS password content has visible line height
+PASS selected model label uses DisplayMemberPath
+PASS styled ScrollViewer retains scrolling

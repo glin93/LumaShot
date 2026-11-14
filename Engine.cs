@@ -10,7 +10,10 @@ using System.Text;
 using System.Runtime.InteropServices;
 
 namespace LumaShot {
- public class CaptureEngine {
+ public class CaptureEngine : IDisposable {
+  ResidentCapture resident,standby;bool active,disposed,warmEnabled;readonly string residentProfile;int slot,operation;
+  internal ResidentCapture Resident {get{return resident;}}
+  internal bool VerifyResident;
   public string Exe,Folder,Inbox; public Process Running;readonly Preferences preferences;readonly string config;
   public CaptureEngine(string root,Preferences options=null) {
    preferences=options??new Preferences(root);
@@ -18,14 +21,15 @@ namespace LumaShot {
    string settings=Path.Combine(Folder,"ShareX");Directory.CreateDirectory(settings);
    // Dedicated portable engine; never touches an installed ShareX profile.
    config=Path.Combine(settings,"ApplicationConfig.json");
+   residentProfile=Path.Combine(root,"capture-engine");
   }
-  void Configure(int duration){
+  void Configure(int duration,string destination=null){
    var screen=System.Windows.Forms.SystemInformation.VirtualScreen;
-   var settings=new {ShowStartScreen=false,ShowIconPackPrompt=false,FirstTimeMinimizeToTray=false,ShowTray=true,SilentRun=true,AutoCheckUpdate=false,DisableUpload=true,DisableHotkeys=true,UseAlternativeClipboardCopyImage=true,UseCustomScreenshotsPath=true,CustomScreenshotsPath=Inbox,SaveImageSubFolderPattern="",SaveImageSubFolderPatternWindow="",HistorySaveTasks=true,
+   var settings=new {ShowStartScreen=false,ShowIconPackPrompt=false,FirstTimeMinimizeToTray=false,ShowTray=true,SilentRun=true,AutoCheckUpdate=false,DisableUpload=true,DisableHotkeys=true,UseAlternativeClipboardCopyImage=true,UseCustomScreenshotsPath=true,CustomScreenshotsPath=Inbox,SaveImageSubFolderPattern="",SaveImageSubFolderPatternWindow="",HistorySaveTasks=destination==null,RecentTasksSave=false,SaveSettingsAfterTaskCompleted=false,
     DefaultTaskSettings=new {AfterCaptureJob="SaveImageToFile",AfterUploadJob="None",GeneralSettings=new {PlaySoundAfterCapture=false,PlaySoundAfterUpload=false,ShowToastNotificationAfterTaskCompleted=false},
      CaptureSettings=new {ScreenRecordUseNative=true,ScreenRecordShowBar=duration==0,ScreenRecordFixedDuration=duration>0,ScreenRecordDuration=duration,ScreenRecordFPS=30,ScreenRecordRequireHardwareEncoder=false,ScreenRecordSystemAudio=preferences.SystemAudio,ScreenRecordMicrophone=preferences.Microphone,ScreenRecordCamera=false,CaptureCustomRegion=string.Format(System.Globalization.CultureInfo.InvariantCulture,"{0}, {1}, {2}, {3}",screen.X,screen.Y,screen.Width,screen.Height)},
      UploadSettings=new {NameFormatPattern="Luma_%y-%mo-%d_%h-%mi-%s_%ra{6}",NameFormatPatternActiveWindow="Luma_%y-%mo-%d_%h-%mi-%s_%ra{6}"}}};
-   File.WriteAllText(config,Backend.Json().Serialize(settings),Encoding.UTF8);
+   string path=destination??config;Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllText(path,Backend.Json().Serialize(settings),Encoding.UTF8);
   }
   void RememberRecordingAudio(bool initialMic,bool initialSystem){
    var app=Backend.Json().Deserialize<System.Collections.Generic.Dictionary<string,object>>(File.ReadAllText(config));
@@ -36,26 +40,77 @@ namespace LumaShot {
    if(system!=initialSystem)preferences.Values["recording.systemAudio"]=system?"true":"false";
    if(mic!=initialMic||system!=initialSystem)preferences.Save();
   }
-  public bool Busy { get {return Running!=null&&!Running.HasExited;} }
+  bool SupportsResident {get{return Path.GetFileName(Exe)=="ShareX.exe"&&File.Exists(Path.Combine(Folder,"LumaShot.Capture.exe"));}}
+  public async Task WarmUp(){warmEnabled=true;try{await EnsureResident();}catch{}}
+  ResidentCapture CreateResident(){
+   string profile=Path.Combine(residentProfile,(slot++%2)==0?"a":"b");Configure(0,Path.Combine(profile,"ApplicationConfig.json"));return new ResidentCapture(Path.Combine(Folder,"LumaShot.Capture.exe"),profile,VerifyResident);
+  }
+  async Task EnsureResident(){
+   if(disposed)throw new ObjectDisposedException("CaptureEngine");
+   if(!SupportsResident)return;
+   if(resident==null||!resident.Alive){if(resident!=null)resident.Dispose();resident=CreateResident();}
+   await resident.Ready();
+  }
+  public void Dispose(){disposed=true;operation++;if(standby!=null){standby.Dispose();standby=null;}if(resident!=null){resident.Dispose();resident=null;}}
+  // Some native renderer allocations outlive a closed ShareX selector. Recycle
+  // only after a quiet period and only above the private-byte budget. Prepare
+  // the replacement first so captures can continue using the current host.
+  async void ReclaimIdleHost(int version,ResidentCapture previous){
+   try{
+    await Task.Delay(20000);
+    if(disposed||active||operation!=version||resident!=previous||!previous.Alive||standby!=null)return;
+    previous.Process.Refresh();if(previous.Process.PrivateMemorySize64<=192*1048576L)return;
+    var replacement=CreateResident();standby=replacement;
+    try{
+     await replacement.Ready();
+     if(active||disposed||resident!=previous){replacement.Dispose();return;}
+     resident=replacement;previous.Dispose();
+    }finally{if(ReferenceEquals(standby,replacement))standby=null;}
+   }catch{if(standby!=null){standby.Dispose();standby=null;}}
+  }
+  public bool Busy { get {return active||(Running!=null&&!Running.HasExited);} }
   public async Task Run(string action,string file=null,int duration=0) {
    if(Busy)throw new InvalidOperationException("请先完成或取消当前的截图 / 编辑任务。");
+   if(disposed)throw new ObjectDisposedException("CaptureEngine");
    if(!File.Exists(Exe))throw new FileNotFoundException("找不到 ShareX 引擎，请保留完整的 engine 文件夹。");
+   active=true;int version=++operation;
+   try{
+    if(SupportsResident&&file==null&&(action=="RectangleRegion"||action=="ActiveWindow"||action=="PrintScreen"||(VerifyResident&&action=="VerifyCancel"))){
+     await EnsureResident();Running=resident.Process;
+     try{using(var branding=new EngineBranding(Running))await resident.Capture(action);}
+     finally{Running=null;}
+    }else{
+     if(resident!=null){resident.Dispose();resident=null;}
+     await RunOnce(action,file,duration);
+    }
+   }finally{active=false;if(!disposed&&resident!=null&&resident.Alive)ReclaimIdleHost(version,resident);}
+   if(warmEnabled&&resident==null&&!disposed)await WarmUp();
+  }
+  async Task RunOnce(string action,string file,int duration){
    bool mic=preferences.Microphone,system=preferences.SystemAudio;Configure(duration);
    var si=new ProcessStartInfo(Exe,"-portable -multi -silent -nohotkeys -autoclose -"+action+(file==null?"":" \""+file+"\"")){UseShellExecute=false,WorkingDirectory=Folder};
-   Running=Process.Start(si);using(var branding=new EngineBranding(Running)){if(action=="ImageEditor")await WaitEditorExit(Running);else await Task.Run(()=>Running.WaitForExit());}
-   int exit=Running.ExitCode;Running.Dispose();Running=null;if(exit!=0)throw new IOException("截图引擎退出，代码："+exit+"。可以重试，或检查 engine/ShareX/Logs。");
+   var process=Process.Start(si);Running=process;
+   try{
+    using(var branding=new EngineBranding(process))await WaitTaskExit(process);
+    int exit=process.ExitCode;if(exit!=0)throw new IOException("截图引擎退出，代码："+exit+"。可以重试，或检查 engine/ShareX/Logs。");
+   }finally{if(ReferenceEquals(Running,process))Running=null;process.Dispose();}
    if(action.StartsWith("ScreenRecorder",StringComparison.Ordinal)&&duration==0)RememberRecordingAudio(mic,system);
   }
-  // ShareX 22.4 leaves its host running when the standalone editor is cancelled
-  // or saves directly. Close only this dedicated child's idle host, via its
-  // normal shutdown message, after all editor/dialog windows have disappeared.
-  async Task WaitEditorExit(Process process){
-   bool seen=false;int idle=0;TimeSpan cpu=process.TotalProcessorTime;
+  // ShareX 22.4 only auto-closes after an upload task completes. Cancelling a
+  // region, recording setup or editor creates no such task. Observe ALL visible
+  // windows (region selectors have no caption), then close this child's idle
+  // host normally. Never time out a visible selector, editor or recording bar.
+  internal async Task WaitTaskExit(Process process){
+   bool seen=false;int idle=0;TimeSpan cpu=process.TotalProcessorTime;var age=Stopwatch.StartNew();bool closeRequested=false;
    while(!process.HasExited){
     bool visible=false;IntPtr host=IntPtr.Zero;
-    EnumWindows((window,data)=>{uint pid;GetWindowThreadProcessId(window,out pid);if(pid!=(uint)process.Id)return true;var title=new StringBuilder(256);GetWindowText(window,title,title.Capacity);if(title.ToString()=="ShareX - Hotkey host")host=window;else if(IsWindowVisible(window)&&title.Length>0)visible=true;return true;},IntPtr.Zero);
-    if(visible){seen=true;idle=0;}else if(seen){var next=process.TotalProcessorTime;idle=(next-cpu).TotalMilliseconds<20?idle+1:0;cpu=next;if(idle>=10&&host!=IntPtr.Zero){PostMessage(host,0x10,IntPtr.Zero,IntPtr.Zero);await Task.Run(()=>process.WaitForExit());return;}}
-    await Task.Delay(500);
+    EnumWindows((window,data)=>{uint pid;GetWindowThreadProcessId(window,out pid);if(pid!=(uint)process.Id)return true;var title=new StringBuilder(256);GetWindowText(window,title,title.Capacity);if(title.ToString()=="ShareX - Hotkey host")host=window;else if(IsWindowVisible(window))visible=true;return true;},IntPtr.Zero);
+    if(process.HasExited)break;
+    var next=process.TotalProcessorTime;bool working=(next-cpu).TotalMilliseconds>=20;cpu=next;
+    if(visible){seen=true;idle=0;closeRequested=false;}
+    else if(!working&&(seen||age.Elapsed.TotalSeconds>=20))idle++;else idle=0;
+    if(idle>=40&&host!=IntPtr.Zero&&!closeRequested){PostMessage(host,0x10,IntPtr.Zero,IntPtr.Zero);closeRequested=true;}
+    await Task.Delay(100);
    }
   }
   delegate bool EnumWindowCallback(IntPtr window,IntPtr data);

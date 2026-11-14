@@ -8,6 +8,7 @@ $references=@('System.dll','System.Core.dll','System.Drawing.dll','System.Window
 $compilerArgs=@('/nologo','/target:winexe','/platform:x64','/optimize+','/utf8output','/main:LumaShot.ShowcaseProgram',('/out:'+$exe),('/win32icon:'+(Join-Path $root 'LumaShot.ico')))
 foreach($reference in $references){$compilerArgs+='/reference:'+(Join-Path $framework $reference)}
 $compilerArgs+=(Get-ChildItem -LiteralPath $root -Filter '*.cs').FullName
+$compilerArgs+=@("/reference:$root\MdXaml.dll","/reference:$root\MdXaml.Plugins.dll","/reference:$root\ICSharpCode.AvalonEdit.dll")
 $compilerArgs+=Join-Path $PSScriptRoot 'render-showcase.cs'
 try {
  & (Join-Path $framework 'csc.exe') @compilerArgs

@@ -1,0 +1,7 @@
+PASS ShareX ActiveWindow -> inbox -> persistent library
+PASS import deduplication survives restart
+PASS engine preserves clipboard; app copies image data compatible with Ctrl+V
+PASS FFmpeg encoding and video history thumbnail
+PASS MP4 to GIF export
+PASS ScreenRecorderActiveWindow records fixture and creates playable video history (microphone off, system audio on)
+PASS ScreenRecorderCustomRegion records fixture and creates playable video history (microphone off, system audio on)

@@ -1,0 +1,21 @@
+Warm startup: 1100 ms; private=66 MB, working=140 MB
+PASS region cancel 1: selector visible in 638 ms; task completed in 850 ms
+PASS region cancel 2: selector visible in 465 ms; task completed in 693 ms
+PASS region cancel 3: selector visible in 438 ms; task completed in 623 ms
+PASS region cancel 4: selector visible in 462 ms; task completed in 611 ms
+Capture 1: dispatch=1 ms, save=167 ms; private=424 MB, working=520 MB
+Capture 5: dispatch=0 ms, save=465 ms; private=571 MB, working=645 MB
+Capture 10: dispatch=1 ms, save=469 ms; private=547 MB, working=618 MB
+Capture 15: dispatch=0 ms, save=486 ms; private=530 MB, working=594 MB
+Capture 20: dispatch=0 ms, save=518 ms; private=477 MB, working=553 MB
+PASS 20 captures saved by one process; idle private=278 MB, working=404 MB
+PASS second burst (10 cancellations + 10 captures), same process; idle private=421 MB, working=533 MB
+Idle managed MB=12; retained closed selectors=1/4
+Idle managed MB=26; retained closed selectors=3/14
+
+PASS idle replacement already warm; private=113 MB, working=196 MB
+PASS next capture dispatch after recycle: 2 ms
+CPU time during 2 s immediately after capture (includes completion work): 578.125 ms
+PASS concurrent capture rejected; active-process crash releases state and next capture succeeds
+PASS application shutdown removes resident child
+PASS desktop UI: two full-screen captures appear in the isolated library and floating previews; Exit closes both the app and resident host.

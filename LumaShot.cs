@@ -19,11 +19,16 @@ using F=System.Windows.Forms;
 namespace LumaShot {
  public class Program {
   [STAThread] public static void Main(string[] args) {
+   var fixture=args.FirstOrDefault(x=>x.StartsWith("-Lifecycle",StringComparison.Ordinal));if(fixture!=null){LifecycleTests.Fixture(fixture);return;}
    Native.SetProcessDPIAware();
    string root=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"LumaShot","Library");
    for(int i=0;i<args.Length-1;i++)if(args[i]=="--data")root=Path.GetFullPath(args[i+1]);
    try {
     if(args.Contains("--self-test")){Tests.Run(root);return;}
+    if(args.Contains("--lifecycle-test")){LifecycleTests.Run(root);return;}
+    if(args.Contains("--resident-test")){ResidentTests.Run(root);return;}
+    if(args.Contains("--layout-test")){LayoutTests.Run(root);return;}
+    if(args.Contains("--unicode-test")){LayoutTests.CheckUnicode(root);return;}
     if(args.Contains("--engine-test")){Tests.EngineSmoke(root);return;}
     if(args.Contains("--recording-test")){Tests.RecordingSmoke(root);return;}
     if(args.Contains("--surface-test")){Tests.SurfaceSmoke(root);return;}
@@ -33,7 +38,7 @@ namespace LumaShot {
      var app=new Application();app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
      app.DispatcherUnhandledException+=(s,e)=>{MessageBox.Show(e.Exception.Message,"LumaShot");e.Handled=true;};
      var lib=new Library(root);if(args.Contains("--demo")&&lib.Items.Count==0)Demo.Seed(lib);
-     var ui=new MainUI(lib,args.Contains("--demo"));if(args.Contains("--demo-surfaces"))ui.Window.Loaded+=(s,e)=>ui.PreviewCaptureSurfaces();app.Run(ui.Window);}
+     var ui=new MainUI(lib,args.Contains("--demo"));if(args.Contains("--demo-surfaces"))ui.Window.Loaded+=(s,e)=>ui.PreviewCaptureSurfaces();if(args.Contains("--demo-tray"))ui.Window.Loaded+=(s,e)=>ui.ShowTrayMenu();app.Run(ui.Window);}
     }
    }catch(Exception e){Directory.CreateDirectory(root);File.WriteAllText(Path.Combine(root,"startup-error.txt"),e.ToString());if(args.Contains("--self-test")){Environment.ExitCode=1;return;}MessageBox.Show(e.Message,"LumaShot · 启动失败");}
   }
@@ -42,14 +47,14 @@ namespace LumaShot {
   public Window Window;Library lib;CaptureEngine engine;bool demo,oldest,quitting,scanning;string filter="all";Shot selected;int shown=48;
   StackPanel history,inspector;TextBox search;TextBlock status;F.NotifyIcon tray;System.Drawing.Icon appIcon;DispatcherTimer poll;IntPtr handle;HashSet<string> batch=new HashSet<string>();double cardWidth=216;
   public MainUI(Library l,bool isDemo) {
-   lib=l;demo=isDemo;preferences=new Preferences(lib.Root);
+   lib=l;demo=isDemo;aiAvailable=demo;preferences=new Preferences(lib.Root);
    using(var stream=File.OpenRead(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Main.xaml")))Window=(Window)XamlReader.Load(stream);
    appIcon=System.Drawing.Icon.ExtractAssociatedIcon(System.Reflection.Assembly.GetExecutingAssembly().Location);Window.Icon=Imaging.CreateBitmapSourceFromHIcon(appIcon.Handle,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());
    if(demo)Window.Title="LumaShot · 界面预览（示例资料库）";
    history=Get<StackPanel>("History");inspector=Get<StackPanel>("Inspector");search=Get<TextBox>("Search");status=Get<TextBlock>("Status");
    engine=new CaptureEngine(lib.Root,preferences);
    Click("NavAll",()=>Navigate("all"));Click("NavStar",()=>Navigate("favorites"));Click("NavImage",()=>Navigate("image"));Click("NavVideo",()=>Navigate("video"));Click("NavTrash",()=>Navigate("trash"));
-   Click("Capture",()=>Run("RectangleRegion",null,true));Click("CaptureMenu",ShowCaptureMenu);Click("Import",ImportDialog);Click("Sort",()=>{oldest=!oldest;Get<Button>("Sort").Content=oldest?"↑  最早优先":"↓  最新优先";Refresh();});
+   Click("Capture",()=>Run("RectangleRegion",null));Click("CaptureMenu",ShowCaptureMenu);Click("Import",ImportDialog);Click("Sort",()=>{oldest=!oldest;Get<Button>("Sort").Content=oldest?"↑  最早优先":"↓  最新优先";Refresh();});
    Click("QuickHistory",ToggleQuickHistory);Click("Settings",Settings);Click("Quit",()=>Exit());
    var debounce=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(200)};debounce.Tick+=(s,e)=>{debounce.Stop();shown=48;Refresh();};
    search.TextChanged+=(s,e)=>{Get<TextBlock>("SearchHint").Visibility=search.Text.Length>0?Visibility.Collapsed:Visibility.Visible;debounce.Stop();debounce.Start();};
@@ -59,18 +64,19 @@ namespace LumaShot {
    Window.AllowDrop=true;Window.DragOver+=(s,e)=>{e.Effects=e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None;e.Handled=true;};Window.Drop+=async(s,e)=>{if(e.Data.GetDataPresent(DataFormats.FileDrop))await ImportPaths((string[])e.Data.GetData(DataFormats.FileDrop));};
    Window.SourceInitialized+=(s,e)=>{handle=new WindowInteropHelper(Window).Handle;HwndSource.FromHwnd(handle).AddHook(Hook);ApplyBindings();};
    Window.Closing+=(s,e)=>{if(!quitting){e.Cancel=true;Window.Hide();}};
-   tray=new F.NotifyIcon{Icon=appIcon,Text="LumaShot",Visible=true};tray.MouseClick+=(s,e)=>{if(e.Button==F.MouseButtons.Left)ToggleQuickHistory();};UpdateTray();
+   tray=new F.NotifyIcon{Icon=appIcon,Text="LumaShot",Visible=true};tray.MouseClick+=(s,e)=>{if(e.Button==F.MouseButtons.Left)ToggleQuickHistory();else if(e.Button==F.MouseButtons.Right)ShowTrayMenu();};UpdateTray();
    poll=new DispatcherTimer{Interval=TimeSpan.FromSeconds(3)};poll.Tick+=async(s,e)=>{await Scan();await IndexText();};poll.Start();StartIntegrations();
-   selected=lib.Items.FirstOrDefault(x=>!x.Deleted);Navigate("all");Window.Loaded+=async(s,e)=>{await RefreshAIAvailability();await Scan();if(!string.IsNullOrEmpty(lib.Notice))Say(lib.Notice);};
+   selected=lib.Items.FirstOrDefault(x=>!x.Deleted);Navigate("all");Window.Loaded+=async(s,e)=>{if(!demo)StartCaptureEngine();await RefreshAIAvailability();await Scan();if(!string.IsNullOrEmpty(lib.Notice))Say(lib.Notice);};
   }
+  async void StartCaptureEngine(){await engine.WarmUp();}
   T Get<T>(string name)where T:FrameworkElement{return (T)Window.FindName(name);}
   void Click(string name,Action a){Get<Button>(name).Click+=(s,e)=>Safe(a);}
   void Safe(Action a){try{a();}catch(Exception e){MessageBox.Show(Window,e.Message,"LumaShot",MessageBoxButton.OK,MessageBoxImage.Information);}}
   public void Say(string message){status.Text=message;}
   void Show(){HideQuickHistory();Window.Show();Window.WindowState=WindowState.Normal;Window.Activate();}
-  void Exit(){if(engine.Busy||capturing||maintenance){MessageBox.Show(Window,"请先完成或关闭正在进行的截图、标注、录制或备份，再退出。","LumaShot");return;}quitting=true;poll.Stop();if(syncTimer!=null)syncTimer.Stop();if(backend!=null)backend.Dispose();UnregisterBindings();CloseSurfaces();tray.Dispose();appIcon.Dispose();Window.Close();Application.Current.Shutdown();}
+  void Exit(){if(engine.Busy||capturing||maintenance){MessageBox.Show(Window,"请先完成或关闭正在进行的截图、标注、录制或备份，再退出。","LumaShot");return;}quitting=true;poll.Stop();if(syncTimer!=null)syncTimer.Stop();engine.Dispose();if(backend!=null)backend.Dispose();UnregisterBindings();CloseSurfaces();tray.Dispose();appIcon.Dispose();Window.Close();Application.Current.Shutdown();}
   IntPtr Hook(IntPtr h,int msg,IntPtr wp,IntPtr lp,ref bool handled){if(msg==0x312){int index=wp.ToInt32()-1;if(index>=0&&index<Preferences.Actions.Length){handled=true;RunShortcut(Preferences.Actions[index]);}}return IntPtr.Zero;}
-  void RunShortcut(string action){int index=Array.IndexOf(Preferences.Actions,action);if(index>=0&&index<Preferences.EngineActions.Length)Run(Preferences.EngineActions[index],null,true);else if(action=="quickHistory")ToggleQuickHistory();else if(action=="library")Show();}
+  void RunShortcut(string action){int index=Array.IndexOf(Preferences.Actions,action);if(index>=0&&index<Preferences.EngineActions.Length)Run(Preferences.EngineActions[index],null);else if(action=="quickHistory")ToggleQuickHistory();else if(action=="library")Show();}
   void Navigate(string f){batch.Clear();filter=f;shown=48;selected=null;Get<TextBlock>("Heading").Text=f=="favorites"?"我的收藏":f=="image"?"截图与动图":f=="video"?"屏幕录制":f=="trash"?"回收站":"截图历史";var pairs=new Dictionary<string,string>{{"NavAll","all"},{"NavStar","favorites"},{"NavImage","image"},{"NavVideo","video"},{"NavTrash","trash"}};foreach(var p in pairs){Get<Button>(p.Key).Background=B(p.Value==f?"#353047":"#1B1D2B");Get<Button>(p.Key).Foreground=B(p.Value==f?"#E3DAFF":"#9297AD");}Refresh();}
   List<Shot> Filtered(){var q=lib.Query(filter,search.Text,oldest);int d=Get<ComboBox>("DateFilter").SelectedIndex;if(d>0){DateTime from=DateTime.Today.AddDays(d==1?0:d==2?-6:-29);q=q.Where(x=>x.Date>=from);}return q.ToList();}
   void Refresh(){
@@ -100,8 +106,10 @@ namespace LumaShot {
    var menu=new ContextMenu();Add(menu,"复制图片 / 文件",()=>{selected=item;CopySelected();});Add(menu,"编辑标注",()=>{selected=item;Edit();});Add(menu,item.Star?"取消收藏":"加入收藏",()=>{item.Star=!item.Star;lib.Save();Refresh();});Add(menu,item.Deleted?"恢复记录":"移到回收站",()=>{item.Deleted=!item.Deleted;lib.Save();Refresh();});border.ContextMenu=menu;
    return border;
   }
-  void Empty(){var panel=new StackPanel{Margin=new Thickness(15,85,15,0),HorizontalAlignment=HorizontalAlignment.Center};var icon=new Border{Width=76,Height=76,Background=B("#ECE7FB"),CornerRadius=new CornerRadius(22),Child=new TextBlock{Text="▧",Foreground=B("#9B85DC"),FontSize=42,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};panel.Children.Add(icon);var title=T(string.IsNullOrEmpty(search.Text)?(filter=="trash"?"回收站很干净":"还没有截图"):"没有找到匹配的记录",19,"#4D5065");title.Margin=new Thickness(0,23,0,12);title.TextAlignment=TextAlignment.Center;panel.Children.Add(title);var desc=T("截图后自动保存到历史。",11,"#9599AD");desc.TextAlignment=TextAlignment.Center;desc.TextWrapping=TextWrapping.Wrap;panel.Children.Add(desc);if(filter=="all"&&search.Text==""){var start=Btn("＋  开始第一次截图",()=>Run("RectangleRegion",null,true),true);start.Margin=new Thickness(0,26,0,0);start.HorizontalAlignment=HorizontalAlignment.Center;panel.Children.Add(start);}history.Children.Add(panel);}
+  void Empty(){var panel=new StackPanel{Margin=new Thickness(15,85,15,0),HorizontalAlignment=HorizontalAlignment.Center};var icon=new Border{Width=76,Height=76,Background=B("#ECE7FB"),CornerRadius=new CornerRadius(22),Child=new TextBlock{Text="▧",Foreground=B("#9B85DC"),FontSize=42,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};panel.Children.Add(icon);var title=T(string.IsNullOrEmpty(search.Text)?(filter=="trash"?"回收站很干净":filter=="favorites"?"还没有收藏":filter=="video"?"还没有录屏":"还没有截图"):"没有找到匹配的记录",19,"#4D5065");title.Margin=new Thickness(0,23,0,12);title.TextAlignment=TextAlignment.Center;panel.Children.Add(title);var desc=T(!string.IsNullOrEmpty(search.Text)||Get<ComboBox>("DateFilter").SelectedIndex>0?"试试其他关键词或时间范围。":filter=="favorites"?"收藏的截图和录屏会显示在这里。":filter=="video"?"完成录屏后，会自动保存到这里。":filter=="trash"?"移入回收站的记录可在这里恢复。":"截图后自动保存到历史。",11,"#9599AD");desc.TextAlignment=TextAlignment.Center;desc.TextWrapping=TextWrapping.Wrap;panel.Children.Add(desc);if(filter=="all"&&search.Text==""){var start=Btn("＋  开始第一次截图",()=>Run("RectangleRegion",null),true);start.Margin=new Thickness(0,26,0,0);start.HorizontalAlignment=HorizontalAlignment.Center;panel.Children.Add(start);}history.Children.Add(panel);}
   void Details(){
+   if(selected!=null&&ReferenceEquals(inspector.Tag,selected)&&inspector.IsKeyboardFocusWithin&&Keyboard.FocusedElement is TextBox)return;
+   inspector.Tag=selected;
    inspector.Children.Clear();if(selected==null){inspector.Children.Add(T("详情",12,"#7D8299"));var icon=T("◈",48,"#DDD8EF");icon.TextAlignment=TextAlignment.Center;icon.Margin=new Thickness(0,100,0,22);inspector.Children.Add(icon);var label=T("选择记录",16,"#757A91");label.TextAlignment=TextAlignment.Center;inspector.Children.Add(label);var help=T("查看、编辑或整理截图。",11,"#A0A5B7");help.TextAlignment=TextAlignment.Center;help.LineHeight=22;help.Margin=new Thickness(0,12,0,0);inspector.Children.Add(help);return;}
    Shot item=selected;inspector.Children.Add(T(item.Deleted?"回收站中的记录":"记录详情",11,"#8D92A7"));
    if(!string.IsNullOrEmpty(item.ParentId)){var parent=lib.Items.FirstOrDefault(x=>x.Id==item.ParentId);if(parent!=null)inspector.Children.Add(Small("查看来源截图",()=>Preview(lib.Full(parent.File),parent.Title)));}
@@ -123,18 +131,18 @@ namespace LumaShot {
   Button Small(string text,Action a){var b=Btn(text,a);b.FontSize=10;b.Padding=new Thickness(7,5,7,5);b.Margin=new Thickness(0,0,5,5);return b;}
   public static SolidColorBrush B(string hex){var b=(SolidColorBrush)new BrushConverter().ConvertFromString(hex);b.Freeze();return b;}
   public static TextBlock T(string text,double size,string color){return new TextBlock{Text=text,FontSize=size,Foreground=B(color)};}
-  Button Btn(string text,Action action,bool accent=false){var b=new Button{Content=text,Style=(Style)Window.FindResource(accent?(object)"Accent":typeof(Button)),HorizontalContentAlignment=HorizontalAlignment.Center};b.Click+=(s,e)=>Safe(action);return b;}
+  Button Btn(string text,Action action,bool accent=false){var b=new Button{Content=text,Style=(Style)Window.FindResource(accent?(object)"Accent":typeof(Button)),HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,6,6)};b.Click+=(s,e)=>Safe(action);return b;}
   void Add(ContextMenu menu,string text,Action a){var m=new MenuItem{Header=text};m.Click+=(s,e)=>Safe(a);menu.Items.Add(m);}
-  void ShowCaptureMenu(){var m=new ContextMenu();for(int i=0;i<6;i++){string action=Preferences.Actions[i];if(i==3)m.Items.Add(new Separator());Add(m,Preferences.Names[i]+"     "+Hotkey(action),()=>RunShortcut(action));}m.Items.Add(new Separator());Add(m,"滚动长截图",()=>Run("ScrollingCapture",null,true));Add(m,"录制动图  GIF",()=>Run("ScreenRecorderGIF",null,true));Add(m,"延时 3 秒截图",async()=>await CaptureTask("RectangleRegion",null,true,3000));Add(m,"从剪贴板导入",PasteImport);m.PlacementTarget=Get<Button>("CaptureMenu");m.IsOpen=true;}
-  async void Run(string action,string file,bool hide){
-   await CaptureTask(action,file,hide);
+  void ShowCaptureMenu(){var m=new ContextMenu();for(int i=0;i<6;i++){string action=Preferences.Actions[i];if(i==3)m.Items.Add(new Separator());Add(m,Preferences.Names[i]+"     "+Hotkey(action),()=>RunShortcut(action));}m.Items.Add(new Separator());Add(m,"滚动长截图",()=>Run("ScrollingCapture",null));Add(m,"录制动图  GIF",()=>Run("ScreenRecorderGIF",null));Add(m,"延时 3 秒截图",async()=>await CaptureTask("RectangleRegion",null,3000));Add(m,"从剪贴板导入",PasteImport);m.PlacementTarget=Get<Button>("CaptureMenu");m.IsOpen=true;}
+  async void Run(string action,string file){
+   await CaptureTask(action,file);
   }
-  internal async Task CaptureTask(string action,string file=null,bool hide=true,int delay=250){
+  internal async Task CaptureTask(string action,string file=null,int delay=0){
    if(maintenance){Say("正在备份，请稍后截图。");return;}
    if(engine.Busy||capturing){Say("请先结束当前截图、编辑或录制。");return;}
-   bool wasVisible=Window.IsVisible;int count=lib.Items.Count;capturing=true;railArea=PointerWorkArea();SuspendSurfaces();
-   try{if(hide){Window.Hide();await Task.Delay(delay);}await engine.Run(action,file);await Scan(true);if(lib.Items.Count==count&&wasVisible)Show();Say(lib.Items.Count>count?"已保存":"已取消");}
-   catch(Exception e){if(wasVisible)Show();Say(e.Message);MessageBox.Show(e.Message,"LumaShot");}
+   int count=lib.Items.Count;capturing=true;railArea=PointerWorkArea();
+   try{await PrepareCaptureSurfaces();if(delay>0)await Task.Delay(delay);await engine.Run(action,file);await Scan(true);Say(lib.Items.Count>count?"已保存":"已取消");}
+   catch(Exception e){Say(e.Message);MessageBox.Show(e.Message,"LumaShot");}
    finally{capturing=false;ResumeSurfaces();}
   }
   async Task Scan(bool fromCapture=false){
@@ -177,15 +185,6 @@ namespace LumaShot {
    var close=TileButton("\uE711","关闭预览 · Esc",()=>win.Close(),true);Grid.SetColumn(close,2);header.Children.Add(close);header.MouseLeftButtonDown+=(s,e)=>{if(e.LeftButton==MouseButtonState.Pressed){win.DragMove();e.Handled=true;}};
    panel.Children.Add(header);var viewport=new Grid{ClipToBounds=true,Margin=new Thickness(4,0,4,4)};viewport.Children.Add(new Image{Source=source,Stretch=Stretch.Uniform});Grid.SetRow(viewport,1);panel.Children.Add(viewport);win.Content=SurfaceFrame(panel);
    win.KeyDown+=(s,e)=>{if(e.Key==Key.Escape){win.Close();e.Handled=true;}};win.Show();
-  }
-  void Settings(){
-   var win=new Window{Title="LumaShot · 设置",Owner=Window,Width=560,Height=650,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=B("#F8F9FC"),FontFamily=Window.FontFamily,Resources=Window.Resources};var p=new StackPanel{Margin=new Thickness(30)};p.Children.Add(T("设置",24,"#34364C"));p.Children.Add(Help("关闭窗口后收起到系统托盘。"));p.Children.Add(Btn("快捷键…",()=>{win.Close();ShortcutSettings();}));p.Children.Add(Btn("截图与录屏…",()=>{win.Close();CaptureSettings();}));
-   var folder=Btn("打开资料库文件夹",()=>Process.Start("explorer.exe","\""+lib.Root+"\""));p.Children.Add(folder);
-   var backup=Btn("备份整个资料库为 ZIP…",Backup);backup.Margin=new Thickness(0,10,0,0);p.Children.Add(backup);
-   var restore=Btn("从备份恢复（合并，不覆盖已有记录）…",RestoreBackup);restore.Margin=new Thickness(0,10,0,0);p.Children.Add(restore);win.Height=700;
-   var paste=Btn("从剪贴板导入图片",()=>{win.Close();PasteImport();});paste.Margin=new Thickness(0,10,0,0);p.Children.Add(paste);
-   p.Children.Add(Btn("AI 方案与云同步…",()=>{win.Close();Connections();}));
-   var about=T("LumaShot 0.1.0\n截图、标注与录制：ShareX 22.4.0；媒体：FFmpeg。",11,"#989DB1");about.LineHeight=21;about.Margin=new Thickness(0,20,0,0);p.Children.Add(about);p.Children.Add(Btn("开源许可",()=>Process.Start(new ProcessStartInfo(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"THIRD_PARTY.md")){UseShellExecute=true})));win.Content=new ScrollViewer{Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};win.ShowDialog();
   }
   void RestoreBackup(){var d=new Microsoft.Win32.OpenFileDialog{Filter="LumaShot 备份|*.zip"};if(d.ShowDialog(Window)!=true)return;try{if(engine.Busy||scanning||syncing||ocrBusy||maintenance)throw new IOException("请先完成当前任务。");int n=BackupRestore.Merge(lib,d.FileName);Refresh();Say("已从备份恢复 "+n+" 条新记录；原有记录未覆盖。");}catch(Exception e){MessageBox.Show(Window,e.Message,"备份恢复失败");}}
   async void Backup(){

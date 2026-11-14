@@ -8,6 +8,8 @@ A Windows screenshot and screen recording app with a persistent library, floatin
 
 [Download v0.1.0](https://github.com/glin93/LumaShot/releases/tag/v0.1.0) · [Report an issue](https://github.com/glin93/LumaShot/issues)
 
+![LumaShot capture library](docs/images/library.png)
+
 ## Features
 
 - **Capture and record.** Capture a region, window, or full screen. Record microphone and system audio independently, with saved preferences.
@@ -16,6 +18,14 @@ A Windows screenshot and screen recording app with a persistent library, floatin
 - **Originals preserved.** Each saved edit creates a new image linked to its original.
 - **Cloud sync.** Automatically merge captures and settings through Google Drive or WebDAV. Shortcut configurations are shared by platform.
 - **Ask AI.** Ask questions about screenshots or sampled video frames using OpenAI or Gemini. Save multiple connections, choose a model from the list, and keep one connection active at a time.
+
+## Screenshots
+
+| Floating previews | Quick history |
+| --- | --- |
+| ![Five recent captures with copy, save, edit, and AI controls](docs/images/floating-previews.png) | ![Floating quick history with thumbnails and search](docs/images/quick-history.png) |
+
+*Illustrated with sample content rendered from the app's interface.*
 
 ## Install
 

@@ -8,6 +8,8 @@ Windows 截图与录屏工具，集成长期历史记录、截后浮窗、图像
 
 [下载 v0.1.0](https://github.com/glin93/LumaShot/releases/tag/v0.1.0) · [反馈问题](https://github.com/glin93/LumaShot/issues)
 
+![LumaShot 截图资料库](docs/images/library.png)
+
 ## 功能
 
 - **截图与录屏**：支持区域、窗口和全屏；麦克风与机内声音分别设置，自动记忆。
@@ -16,6 +18,14 @@ Windows 截图与录屏工具，集成长期历史记录、截后浮窗、图像
 - **保留原图**：每次保存编辑都会生成新图片，并关联原始记录。
 - **云同步**：Google Drive、WebDAV 自动双向合并截图与设置，快捷键按平台同步。
 - **AI 问答**：使用 OpenAI 或 Gemini 对截图、视频采样画面提问。可保存多个连接，从列表选择模型，同一时间启用一个方案。
+
+## 界面展示
+
+| 截后浮窗 | 快速历史 |
+| --- | --- |
+| ![五张截后浮窗，可直接复制、保存、编辑与问 AI](docs/images/floating-previews.png) | ![带缩略图与搜索的快速历史浮窗](docs/images/quick-history.png) |
+
+*使用应用界面与虚构内容生成的展示图。*
 
 ## 安装
 

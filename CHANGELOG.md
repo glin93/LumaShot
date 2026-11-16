@@ -1,3 +1,21 @@
+# 0.1.2
+
+- 统一矢量图标、窗口边框和菜单样式，简化浮窗操作；快速历史加入搜索提示，标签支持直接添加和移除。
+- 修复输入尚未失焦时的保存与同步覆盖问题；选中记录不再重建整页卡片。
+- 成功归档后清理已核对的中转文件，视频/GIF 不再额外保存完整 PNG；本地同步复用媒体路径并优先使用硬链接。
+- Ask AI 流式回复保留消息标题和复制按钮；Gemini 支持增量输出，Markdown 在回复完成后排版。
+- OCR 改为进程内调用，缩略图缓存限制为 32 MiB，资料库每页最多显示 48 条。
+- 修复重复启动、浮窗菜单和最大化窗口边界；更新每显示器 DPI 处理。
+- 格式化 C#、XAML 和后端源码，更新由真实界面控件生成的中英文展示图。
+
+- Unify vector icons, window chrome, and menus; simplify floating actions and add editable tag chips.
+- Save edits before navigation and merge remote fields without discarding changes made during sync.
+- Reclaim verified staging files, avoid redundant video/GIF posters, and reuse local media through hard links where supported.
+- Preserve message headers and copy actions during streaming; stream Gemini responses and render Markdown on completion.
+- Run Windows OCR in process, cap the thumbnail cache at 32 MiB, and limit each library page to 48 records.
+- Activate the existing app on relaunch; fix floating menus and maximized bounds, and improve per-monitor placement.
+- Format application sources and refresh documentation artwork from the actual UI controls.
+
 # 0.1.1
 
 - 截图引擎后台预热并复用；取消后立即释放任务状态，空闲回收临时图像，退出应用时清理引擎。

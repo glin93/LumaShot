@@ -1,0 +1,12 @@
+✔ fragmented UTF-8 SSE emits incremental deltas and preserves Chinese (47.4911ms)
+✔ incomplete or blocked streams fail instead of committing success (4.1904ms)
+✔ transport cancellation propagates and thought parts are excluded (3.8681ms)
+✔ SIWC image extension accepts only inline images and preserves stream completion (32.4547ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 667.4719

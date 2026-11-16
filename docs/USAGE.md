@@ -24,11 +24,15 @@ The default location is `%LOCALAPPDATA%\LumaShot\Library`. Each saved edit creat
 ./LumaShot.exe --demo --data 'D:\LumaShot-demo'
 ```
 
+Use **Settings → Library → Organize storage** to reclaim verified staging and redundant files. Original captures, trash records, and files referenced by the backup index are retained.
+
+可在**设置 → 资料库 → 整理存储**清理已核对的中转文件和重复副本。原图、回收站记录及备份索引仍引用的文件会保留。
+
 ## AI connections / AI 连接
 
-Add an OpenAI or Gemini key in **Settings → AI and sync**, then select a model from the account's supported image-model list. Multiple profiles can be saved; exactly one is active. The floating preview shows the AI action when an active connection has a model selected. Media is sent when you submit a question.
+Add an OpenAI or Gemini key in **Settings → AI services**, then select a model from the account's supported image-model list. Multiple profiles can be saved; exactly one is active. The floating preview shows the AI action when an active connection has a model selected. Media is sent when you submit a question.
 
-在**设置 → AI 与同步**中添加 OpenAI 或 Gemini Key，再从账号支持的图像模型列表中选择模型。可保存多个方案，同时启用一个；启用方案并选择模型后，浮窗显示问 AI。提交问题时才发送所选媒体。
+在**设置 → AI 服务**中添加 OpenAI 或 Gemini Key，再从账号支持的图像模型列表中选择模型。可保存多个方案，同时启用一个；启用方案并选择模型后，浮窗显示问 AI。提交问题时才发送所选媒体。
 
 ChatGPT sign-in requires the optional installer component and an account that supports token sharing. Its license is shown when selecting the component. Its implementation uses the official DevKit with PKCE, state/nonce verification, encrypted credential storage, and token rotation.
 

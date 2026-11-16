@@ -1,8 +1,8 @@
 using System;
-using System.IO;
-using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,43 +11,573 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace LumaShot {
- public partial class MainUI {
-  internal FrameworkElement MarkdownAnswer(string text){
-   var renderer=new MdXaml.Markdown{DisabledTag=true,DisabledContextMenu=true,HyperlinkCommand=null};
-   renderer.OnHyperLinkClicked=url=>{Uri uri;if(Uri.TryCreate(url,UriKind.Absolute,out uri)&&(uri.Scheme=="https"||uri.Scheme=="http"))Process.Start(new ProcessStartInfo(uri.AbsoluteUri){UseShellExecute=true});};
-   // Display image references as links. Rendering an answer never downloads external images.
-   var document=renderer.Transform((text??"").Replace("![","\\!["));document.FontFamily=Window.FontFamily;document.FontSize=14;document.Foreground=B("#343747");document.PagePadding=new Thickness(0);document.LineHeight=23;
-   var paragraphStyle=new Style(typeof(Paragraph));paragraphStyle.Setters.Add(new Setter(Block.MarginProperty,new Thickness(0,0,0,10)));document.Resources.Add(typeof(Paragraph),paragraphStyle);
-   return new RichTextBox{Document=document,IsReadOnly=true,BorderThickness=new Thickness(0),Background=Brushes.Transparent,Padding=new Thickness(0),VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,IsDocumentEnabled=true};
-  }
-  Border ChatMessage(string role,string name,string content){
-   bool user=role=="user";var panel=new StackPanel();var header=new DockPanel{Margin=new Thickness(0,0,0,10)};var copy=Small("复制",async()=>{try{if(!string.IsNullOrEmpty(content))await CaptureClipboard.CopyText(content);}catch(Exception ex){Say(ex.Message);}});copy.Background=Brushes.Transparent;copy.BorderThickness=new Thickness(0);copy.Margin=new Thickness(8,0,0,0);copy.Padding=new Thickness(6,2,6,2);DockPanel.SetDock(copy,Dock.Right);header.Children.Add(copy);var label=T(user?"你":name,12,user?"#7965AA":"#73788E");label.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(label);panel.Children.Add(header);
-   if(user){var value=T(content,14,"#373348");value.TextWrapping=TextWrapping.Wrap;value.LineHeight=23;panel.Children.Add(value);}else panel.Children.Add(MarkdownAnswer(content));
-   return new Border{Child=panel,Background=B(user?"#EEE9FA":"#FFFFFF"),CornerRadius=new CornerRadius(13),BorderBrush=B(user?"#E8E0F7":"#E9EAF1"),BorderThickness=new Thickness(1),Padding=new Thickness(18,14,18,14),Margin=new Thickness(user?70:0,0,user?0:30,16),HorizontalAlignment=HorizontalAlignment.Stretch};
-  }
-  async void Ask(){
-   if(selected==null)return;Shot shot=selected;Dictionary<string,object> state;
-   try{state=demo?Backend.Json().Deserialize<Dictionary<string,object>>("{\"activeAIId\":\"preview\",\"profiles\":[{\"id\":\"preview\",\"name\":\"AI\",\"provider\":\"preview\",\"model\":\"界面预览\"}]}"):await Connection().Call("state");UpdateAIAvailability(state);}catch(Exception ex){Say(ex.Message);return;}
-   string profileId=Backend.S(state,"activeAIId");var profile=Backend.Rows(state,"profiles").FirstOrDefault(x=>Backend.S(x,"id")==profileId);if(profile==null||string.IsNullOrEmpty(Backend.S(profile,"model"))){Connections();Say("请先选择 AI 方案和模型。");return;}
-   Grid shell;var win=DialogShell("Ask AI",880,820,out shell);var dock=new DockPanel{Margin=new Thickness(26,4,26,22)};shell.Children.Add(dock);
-   var heading=new DockPanel{Margin=new Thickness(0,0,0,18)};var configure=Small("AI 设置",()=>OpenSettings("ai"));configure.VerticalAlignment=VerticalAlignment.Center;DockPanel.SetDock(configure,Dock.Right);heading.Children.Add(configure);var title=T("Ask AI",27,"#282A38");title.FontWeight=FontWeights.SemiBold;heading.Children.Add(title);DockPanel.SetDock(heading,Dock.Top);dock.Children.Add(heading);
-   var attachment=new Grid();attachment.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(84)});attachment.ColumnDefinitions.Add(new ColumnDefinition());var thumbnail=new Image{Width=70,Height=50,Stretch=Stretch.Uniform};try{thumbnail.Source=Images.Load(lib.Full(shot.Thumb),180);}catch{}attachment.Children.Add(new Border{Background=B("#F1F2F7"),CornerRadius=new CornerRadius(6),Child=thumbnail,Margin=new Thickness(0,0,14,0)});var info=new StackPanel{VerticalAlignment=VerticalAlignment.Center};var fileTitle=T(shot.Title,13,"#404356");fileTitle.TextTrimming=TextTrimming.CharacterEllipsis;info.Children.Add(fileTitle);info.Children.Add(new TextBlock{Text=shot.Width+" × "+shot.Height+"  ·  "+Backend.S(profile,"model"),Foreground=B("#858A9D"),FontSize=11,Margin=new Thickness(0,5,0,0)});Grid.SetColumn(info,1);attachment.Children.Add(info);var attachmentFrame=new Border{Child=attachment,Background=Brushes.White,BorderBrush=B("#E5E7F0"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Padding=new Thickness(12),Margin=new Thickness(0,0,0,12)};DockPanel.SetDock(attachmentFrame,Dock.Top);dock.Children.Add(attachmentFrame);
-   var footer=new StackPanel();DockPanel.SetDock(footer,Dock.Bottom);dock.Children.Add(footer);var media=Help("正在检查媒体…");media.Margin=new Thickness(2,10,0,8);footer.Children.Add(media);var composer=new Grid();composer.RowDefinitions.Add(new RowDefinition());composer.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});var prompt=new TextBox{AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=74,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(3),Background=Brushes.Transparent,BorderThickness=new Thickness(0),FontSize=14,Text=""};System.Windows.Automation.AutomationProperties.SetName(prompt,"向 AI 提问");composer.Children.Add(prompt);var placeholder=T("针对这张截图提问…",14,"#9398AA");placeholder.Margin=new Thickness(4,4,0,0);placeholder.IsHitTestVisible=false;composer.Children.Add(placeholder);prompt.TextChanged+=(s,e)=>placeholder.Visibility=prompt.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
-   var actions=new DockPanel{Margin=new Thickness(0,10,0,0)};Grid.SetRow(actions,1);composer.Children.Add(actions);var send=Btn("发送  ↑",()=>{},true);send.Padding=new Thickness(18,8,18,8);send.Margin=new Thickness(8,0,0,0);send.IsEnabled=false;DockPanel.SetDock(send,Dock.Right);actions.Children.Add(send);var stop=Btn("停止",()=>{});stop.Padding=new Thickness(12,8,12,8);stop.Margin=new Thickness(0);stop.Visibility=Visibility.Collapsed;DockPanel.SetDock(stop,Dock.Right);actions.Children.Add(stop);var hint=T("Ctrl + Enter 发送",11,"#9499AC");hint.VerticalAlignment=VerticalAlignment.Center;actions.Children.Add(hint);footer.Children.Add(new Border{Child=composer,Background=Brushes.White,BorderBrush=B("#DCDDE8"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(13),Padding=new Thickness(15)});
-   var chat=new StackPanel{Margin=new Thickness(0,6,8,0)};var scroll=new ScrollViewer{Content=chat,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};dock.Children.Add(scroll);var messages=new List<Dictionary<string,object>>();try{if(!string.IsNullOrWhiteSpace(shot.AiHistory))messages=Backend.Json().Deserialize<List<Dictionary<string,object>>>(shot.AiHistory);}catch{}
-   if(demo&&messages.Count==0){messages.Add(new Dictionary<string,object>{{"role","user"},{"provider","你"},{"content","帮我总结这个页面，有哪些值得保留的设计？"}});messages.Add(new Dictionary<string,object>{{"role","assistant"},{"provider","AI"},{"content","### 清晰，也留有呼吸感\n\n这个页面把重要信息放在了最容易看到的位置。\n\n- **信息层级**：标题、关键数据和图表各有明确的位置。\n- **颜色使用**：紫色只用来强调重点，其余区域保持安静。\n- **布局节奏**：卡片间距一致，阅读起来很轻松。\n\n可以保留这套结构，再补充数据的时间范围。"}});}
-   Action render=()=>{chat.Children.Clear();if(messages.Count==0){var empty=new StackPanel{Margin=new Thickness(20,32,20,22)};var hello=T("从这张截图开始",21,"#4C5068");hello.FontWeight=FontWeights.SemiBold;empty.Children.Add(hello);empty.Children.Add(Help("总结重点、提取文字，或继续追问。"));var suggestions=new WrapPanel();foreach(string suggestion in new[]{"总结内容","提取图中文字","给出改进建议"}){string value=suggestion;var b=Btn(value,()=>{prompt.Text=value;prompt.Focus();});b.Padding=new Thickness(12,8,12,8);suggestions.Children.Add(b);}empty.Children.Add(suggestions);chat.Children.Add(empty);}else foreach(var entry in messages)chat.Children.Add(ChatMessage(Backend.S(entry,"role"),Backend.S(entry,"provider"),Backend.S(entry,"content")));};render();string request=null;bool ready=false,closed=false;string currentQuestion="",streamText="";Border streaming=null;bool dirty=false;
-   var flush=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(180)};Action updateStream=()=>{if(!dirty||streaming==null||closed)return;bool atEnd=scroll.VerticalOffset>=scroll.ScrollableHeight-60;streaming.Child=MarkdownAnswer(streamText.Length==0?"正在思考…":streamText);dirty=false;if(atEnd)scroll.ScrollToEnd();};flush.Tick+=(s,e)=>updateStream();
-   Func<Task> submit=async()=>{if(!ready||request!=null||string.IsNullOrWhiteSpace(prompt.Text))return;currentQuestion=prompt.Text.Trim();request=Guid.NewGuid().ToString("N");send.IsEnabled=false;prompt.IsReadOnly=true;stop.Visibility=Visibility.Visible;streamText="";render();if(messages.Count==0)chat.Children.Clear();chat.Children.Add(ChatMessage("user","你",currentQuestion));streaming=ChatMessage("assistant",Backend.S(profile,"name"),"正在思考…");chat.Children.Add(streaming);scroll.ScrollToEnd();flush.Start();
-    try{var history=messages.Where(x=>Backend.S(x,"profileId")==profileId).Select(x=>new Dictionary<string,object>{{"role",Backend.S(x,"role")},{"content",Backend.S(x,"content")}}).ToArray();var result=await Connection().Call("ask",new Dictionary<string,object>{{"profileId",profileId},{"file",shot.File},{"isVideo",shot.Kind=="video"||shot.Kind=="gif"},{"prompt",currentQuestion},{"history",history}},delta=>Window.Dispatcher.BeginInvoke(new Action(()=>{streamText+=delta;dirty=true;})),request);
-     foreach(var entry in new[]{new[]{"user",currentQuestion},new[]{"assistant",Backend.S(result,"text")}})messages.Add(new Dictionary<string,object>{{"role",entry[0]},{"content",entry[1]},{"profileId",profileId},{"provider",Backend.S(profile,"name")},{"model",Backend.S(result,"model")},{"created",DateTime.UtcNow.ToString("o")}});shot.AiHistory=Backend.Json().Serialize(messages);var current=lib.Items.FirstOrDefault(x=>x.Id==shot.Id);if(current!=null)current.AiHistory=shot.AiHistory;lib.Save();if(!closed){render();prompt.Clear();scroll.ScrollToEnd();}
-    }catch(Exception ex){if(!closed){streaming.Child=MarkdownAnswer(streamText);media.Text=ex.Message;}}
-    finally{flush.Stop();request=null;if(!closed){send.IsEnabled=ready;prompt.IsReadOnly=false;stop.Visibility=Visibility.Collapsed;prompt.Focus();}}
-   };
-   send.Click+=async(s,e)=>await submit();prompt.PreviewKeyDown+=async(s,e)=>{if(e.Key==Key.Enter&&Keyboard.Modifiers==ModifierKeys.Control){e.Handled=true;await submit();}};stop.Click+=async(s,e)=>{if(request!=null){stop.IsEnabled=false;try{await Connection().Cancel(request);}catch(Exception ex){media.Text=ex.Message;}finally{stop.IsEnabled=true;}}};
-   win.Closed+=async(s,e)=>{closed=true;flush.Stop();if(request!=null)try{await Connection().Cancel(request);}catch{}};win.Show();scroll.ScrollToEnd();prompt.Focus();
-   try{if(demo){media.Text="示例对话 · 界面预览";ready=false;}else if(shot.Kind=="video"||shot.Kind=="gif"){var inspection=await Connection().Call("inspect",new Dictionary<string,object>{{"file",shot.File}});double duration=Convert.ToDouble(inspection["duration"]);media.Text="视频 "+duration.ToString("0.0")+" 秒 · 最多采样 24 帧，不含音频";ready=duration>0&&duration<=600;if(!ready)media.Text="请先将视频裁剪为 10 分钟以内。";}else{media.Text=Backend.S(profile,"provider")=="chatgpt"?"Using ChatGPT plan":"回答保存在这张截图的历史中";ready=true;}send.IsEnabled=ready;}catch(Exception ex){media.Text=ex.Message;}
-  }
- }
+namespace LumaShot
+{
+    public partial class MainUI
+    {
+        internal FrameworkElement MarkdownAnswer(string text)
+        {
+            var renderer = new MdXaml.Markdown
+            {
+                DisabledTag = true,
+                DisabledContextMenu = true,
+                HyperlinkCommand = null,
+            };
+            renderer.OnHyperLinkClicked = url =>
+            {
+                Uri uri;
+                if (
+                    Uri.TryCreate(url, UriKind.Absolute, out uri)
+                    && (uri.Scheme == "https" || uri.Scheme == "http")
+                )
+                    Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            };
+            // Display image references as links. Rendering an answer never downloads external images.
+            var document = renderer.Transform((text ?? "").Replace("![", "\\!["));
+            document.FontFamily = Window.FontFamily;
+            document.FontSize = 14;
+            document.Foreground = B("#343747");
+            document.PagePadding = new Thickness(0);
+            document.LineHeight = 23;
+            var paragraphStyle = new Style(typeof(Paragraph));
+            paragraphStyle.Setters.Add(
+                new Setter(Block.MarginProperty, new Thickness(0, 0, 0, 10))
+            );
+            document.Resources.Add(typeof(Paragraph), paragraphStyle);
+            return new RichTextBox
+            {
+                Document = document,
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                Padding = new Thickness(0),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                IsDocumentEnabled = true,
+            };
+        }
+
+        Border ChatMessage(string role, string name, string content)
+        {
+            bool user = role == "user";
+            var message = new ChatMessageState { Text = content };
+            var panel = new StackPanel();
+            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+            var copy = Small(
+                "复制",
+                async () =>
+                {
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(message.Text))
+                            await CaptureClipboard.CopyText(message.Text);
+                    }
+                    catch (Exception ex)
+                    {
+                        Say(ex.Message);
+                    }
+                }
+            );
+            copy.Background = Brushes.Transparent;
+            copy.BorderThickness = new Thickness(0);
+            copy.Margin = new Thickness(8, 0, 0, 0);
+            copy.Padding = new Thickness(6, 2, 6, 2);
+            DockPanel.SetDock(copy, Dock.Right);
+            header.Children.Add(copy);
+            var label = T(user ? "你" : name, 12, user ? "#7965AA" : "#73788E");
+            label.VerticalAlignment = VerticalAlignment.Center;
+            header.Children.Add(label);
+            panel.Children.Add(header);
+            if (user)
+            {
+                var value = T(content, 14, "#373348");
+                value.TextWrapping = TextWrapping.Wrap;
+                value.LineHeight = 23;
+                panel.Children.Add(value);
+            }
+            else
+                panel.Children.Add(MarkdownAnswer(content));
+            var answer = panel.Children[1];
+            panel.Children.RemoveAt(1);
+            message.Body = new ContentControl { Content = answer };
+            panel.Children.Add(message.Body);
+            return new Border
+            {
+                Tag = message,
+                Child = panel,
+                Background = B(user ? "#EEE9FA" : "#FFFFFF"),
+                CornerRadius = new CornerRadius(13),
+                BorderBrush = B(user ? "#E8E0F7" : "#E9EAF1"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(18, 14, 18, 14),
+                Margin = new Thickness(user ? 70 : 0, 0, user ? 0 : 30, 16),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+        }
+
+        sealed class ChatMessageState
+        {
+            public string Text;
+            public ContentControl Body;
+            public TextBlock Streaming;
+        }
+
+        void UpdateChatMessage(Border card, string text, bool complete)
+        {
+            var state = (ChatMessageState)card.Tag;
+            state.Text = text;
+            if (complete)
+            {
+                state.Body.Content = MarkdownAnswer(text);
+                return;
+            }
+            if (state.Streaming == null)
+            {
+                state.Streaming = T("", 14, "#343747");
+                state.Streaming.TextWrapping = TextWrapping.Wrap;
+                state.Streaming.LineHeight = 23;
+                state.Body.Content = state.Streaming;
+            }
+            state.Streaming.Text = text;
+        }
+
+        bool showcaseRendering = false;
+        Window lastAskWindow;
+
+        async void Ask()
+        {
+            if (selected == null)
+                return;
+            Shot shot = selected;
+            Dictionary<string, object> state;
+            try
+            {
+                state = demo
+                    ? Backend
+                        .Json()
+                        .Deserialize<Dictionary<string, object>>(
+                            "{\"activeAIId\":\"preview\",\"profiles\":[{\"id\":\"preview\",\"name\":\"AI\",\"provider\":\"preview\",\"model\":\"界面预览\"}]}"
+                        )
+                    : await Connection().Call("state");
+                UpdateAIAvailability(state);
+            }
+            catch (Exception ex)
+            {
+                Say(ex.Message);
+                return;
+            }
+            string profileId = Backend.S(state, "activeAIId");
+            var profile = Backend
+                .Rows(state, "profiles")
+                .FirstOrDefault(x => Backend.S(x, "id") == profileId);
+            if (profile == null || string.IsNullOrEmpty(Backend.S(profile, "model")))
+            {
+                Connections();
+                Say("请先选择 AI 方案和模型。");
+                return;
+            }
+            Grid shell;
+            var win = DialogShell("Ask AI", 880, 820, out shell);
+            lastAskWindow = win;
+            var dock = new DockPanel { Margin = new Thickness(26, 4, 26, 22) };
+            shell.Children.Add(dock);
+            var heading = new DockPanel { Margin = new Thickness(0, 0, 0, 18) };
+            var configure = Small("AI 设置", () => OpenSettings("ai"));
+            configure.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(configure, Dock.Right);
+            heading.Children.Add(configure);
+            var title = T("Ask AI", 27, "#282A38");
+            title.FontWeight = FontWeights.SemiBold;
+            heading.Children.Add(title);
+            DockPanel.SetDock(heading, Dock.Top);
+            dock.Children.Add(heading);
+            var attachment = new Grid();
+            attachment.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(84) });
+            attachment.ColumnDefinitions.Add(new ColumnDefinition());
+            var thumbnail = new Image
+            {
+                Width = 70,
+                Height = 50,
+                Stretch = Stretch.Uniform,
+            };
+            try
+            {
+                thumbnail.Source = Images.Load(lib.Full(shot.Thumb), 180);
+            }
+            catch { }
+            attachment.Children.Add(
+                new Border
+                {
+                    Background = B("#F1F2F7"),
+                    CornerRadius = new CornerRadius(6),
+                    Child = thumbnail,
+                    Margin = new Thickness(0, 0, 14, 0),
+                }
+            );
+            var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var fileTitle = T(shot.Title, 13, "#404356");
+            fileTitle.TextTrimming = TextTrimming.CharacterEllipsis;
+            info.Children.Add(fileTitle);
+            info.Children.Add(
+                new TextBlock
+                {
+                    Text = shot.Width + " × " + shot.Height + "  ·  " + Backend.S(profile, "model"),
+                    Foreground = B("#858A9D"),
+                    FontSize = 11,
+                    Margin = new Thickness(0, 5, 0, 0),
+                }
+            );
+            Grid.SetColumn(info, 1);
+            attachment.Children.Add(info);
+            var attachmentFrame = new Border
+            {
+                Child = attachment,
+                Background = Brushes.White,
+                BorderBrush = B("#E5E7F0"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 0, 0, 12),
+            };
+            DockPanel.SetDock(attachmentFrame, Dock.Top);
+            dock.Children.Add(attachmentFrame);
+            var footer = new StackPanel();
+            DockPanel.SetDock(footer, Dock.Bottom);
+            dock.Children.Add(footer);
+            var media = Help("正在检查媒体…");
+            media.Margin = new Thickness(2, 10, 0, 8);
+            footer.Children.Add(media);
+            var composer = new Grid();
+            composer.RowDefinitions.Add(new RowDefinition());
+            composer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var prompt = new TextBox
+            {
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Height = 74,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Padding = new Thickness(3),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                FontSize = 14,
+                Text = "",
+            };
+            System.Windows.Automation.AutomationProperties.SetName(prompt, "向 AI 提问");
+            composer.Children.Add(prompt);
+            var placeholder = T("针对这张截图提问…", 14, "#9398AA");
+            placeholder.Margin = new Thickness(4, 4, 0, 0);
+            placeholder.IsHitTestVisible = false;
+            composer.Children.Add(placeholder);
+            prompt.TextChanged += (s, e) =>
+                placeholder.Visibility =
+                    prompt.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var actions = new DockPanel { Margin = new Thickness(0, 10, 0, 0) };
+            Grid.SetRow(actions, 1);
+            composer.Children.Add(actions);
+            var send = Btn("发送  ↑", () => { }, true);
+            send.Padding = new Thickness(18, 8, 18, 8);
+            send.Margin = new Thickness(8, 0, 0, 0);
+            send.IsEnabled = false;
+            DockPanel.SetDock(send, Dock.Right);
+            actions.Children.Add(send);
+            var stop = Btn("停止", () => { });
+            stop.Padding = new Thickness(12, 8, 12, 8);
+            stop.Margin = new Thickness(0);
+            stop.Visibility = Visibility.Collapsed;
+            DockPanel.SetDock(stop, Dock.Right);
+            actions.Children.Add(stop);
+            var hint = T("Ctrl + Enter 发送", 11, "#9499AC");
+            hint.VerticalAlignment = VerticalAlignment.Center;
+            actions.Children.Add(hint);
+            footer.Children.Add(
+                new Border
+                {
+                    Child = composer,
+                    Background = Brushes.White,
+                    BorderBrush = B("#DCDDE8"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(13),
+                    Padding = new Thickness(15),
+                }
+            );
+            var chat = new StackPanel { Margin = new Thickness(0, 6, 8, 0) };
+            var scroll = new ScrollViewer
+            {
+                Content = chat,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            };
+            dock.Children.Add(scroll);
+            var messages = new List<Dictionary<string, object>>();
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(shot.AiHistory))
+                    messages = Backend
+                        .Json()
+                        .Deserialize<List<Dictionary<string, object>>>(shot.AiHistory);
+            }
+            catch { }
+            if (demo && messages.Count == 0)
+            {
+                messages.Add(
+                    new Dictionary<string, object>
+                    {
+                        { "role", "user" },
+                        { "provider", "你" },
+                        { "content", "帮我总结这个页面，有哪些值得保留的设计？" },
+                    }
+                );
+                messages.Add(
+                    new Dictionary<string, object>
+                    {
+                        { "role", "assistant" },
+                        { "provider", "AI" },
+                        {
+                            "content",
+                            "### 清晰，也留有呼吸感\n\n这个页面把重要信息放在了最容易看到的位置。\n\n- **信息层级**：标题、关键数据和图表各有明确的位置。\n- **颜色使用**：紫色只用来强调重点，其余区域保持安静。\n- **布局节奏**：卡片间距一致，阅读起来很轻松。\n\n可以保留这套结构，再补充数据的时间范围。"
+                        },
+                    }
+                );
+            }
+            Action render = () =>
+            {
+                chat.Children.Clear();
+                if (messages.Count == 0)
+                {
+                    var empty = new StackPanel { Margin = new Thickness(20, 32, 20, 22) };
+                    var hello = T("从这张截图开始", 21, "#4C5068");
+                    hello.FontWeight = FontWeights.SemiBold;
+                    empty.Children.Add(hello);
+                    empty.Children.Add(Help("总结重点、提取文字，或继续追问。"));
+                    var suggestions = new WrapPanel();
+                    foreach (
+                        string suggestion in new[] { "总结内容", "提取图中文字", "给出改进建议" }
+                    )
+                    {
+                        string value = suggestion;
+                        var b = Btn(
+                            value,
+                            () =>
+                            {
+                                prompt.Text = value;
+                                prompt.Focus();
+                            }
+                        );
+                        b.Padding = new Thickness(12, 8, 12, 8);
+                        suggestions.Children.Add(b);
+                    }
+                    empty.Children.Add(suggestions);
+                    chat.Children.Add(empty);
+                }
+                else
+                    foreach (var entry in messages)
+                        chat.Children.Add(
+                            ChatMessage(
+                                Backend.S(entry, "role"),
+                                Backend.S(entry, "provider"),
+                                Backend.S(entry, "content")
+                            )
+                        );
+            };
+            render();
+            string request = null;
+            bool ready = false,
+                closed = false;
+            string currentQuestion = "",
+                streamText = "";
+            Border streaming = null;
+            bool dirty = false;
+            var flush = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+            Action updateStream = () =>
+            {
+                if (!dirty || streaming == null || closed)
+                    return;
+                bool atEnd = scroll.VerticalOffset >= scroll.ScrollableHeight - 60;
+                UpdateChatMessage(
+                    streaming,
+                    streamText.Length == 0 ? "正在思考…" : streamText,
+                    false
+                );
+                dirty = false;
+                if (atEnd)
+                    scroll.ScrollToEnd();
+            };
+            flush.Tick += (s, e) => updateStream();
+            Func<Task> submit = async () =>
+            {
+                if (!ready || request != null || string.IsNullOrWhiteSpace(prompt.Text))
+                    return;
+                currentQuestion = prompt.Text.Trim();
+                request = Guid.NewGuid().ToString("N");
+                send.IsEnabled = false;
+                prompt.IsReadOnly = true;
+                stop.Visibility = Visibility.Visible;
+                streamText = "";
+                render();
+                if (messages.Count == 0)
+                    chat.Children.Clear();
+                chat.Children.Add(ChatMessage("user", "你", currentQuestion));
+                streaming = ChatMessage("assistant", Backend.S(profile, "name"), "正在思考…");
+                chat.Children.Add(streaming);
+                scroll.ScrollToEnd();
+                flush.Start();
+                try
+                {
+                    var history = messages
+                        .Where(x => Backend.S(x, "profileId") == profileId)
+                        .Select(x => new Dictionary<string, object>
+                        {
+                            { "role", Backend.S(x, "role") },
+                            { "content", Backend.S(x, "content") },
+                        })
+                        .ToArray();
+                    var result = await Connection()
+                        .Call(
+                            "ask",
+                            new Dictionary<string, object>
+                            {
+                                { "profileId", profileId },
+                                { "file", shot.File },
+                                { "isVideo", shot.Kind == "video" || shot.Kind == "gif" },
+                                { "prompt", currentQuestion },
+                                { "history", history },
+                            },
+                            delta =>
+                                Window.Dispatcher.BeginInvoke(
+                                    new Action(() =>
+                                    {
+                                        streamText += delta;
+                                        dirty = true;
+                                    })
+                                ),
+                            request
+                        );
+                    foreach (
+                        var entry in new[]
+                        {
+                            new[] { "user", currentQuestion },
+                            new[] { "assistant", Backend.S(result, "text") },
+                        }
+                    )
+                        messages.Add(
+                            new Dictionary<string, object>
+                            {
+                                { "role", entry[0] },
+                                { "content", entry[1] },
+                                { "profileId", profileId },
+                                { "provider", Backend.S(profile, "name") },
+                                { "model", Backend.S(result, "model") },
+                                { "created", DateTime.UtcNow.ToString("o") },
+                            }
+                        );
+                    shot.AiHistory = Backend.Json().Serialize(messages);
+                    var current = lib.Items.FirstOrDefault(x => x.Id == shot.Id);
+                    if (current != null)
+                        current.AiHistory = shot.AiHistory;
+                    lib.Save();
+                    if (!closed)
+                    {
+                        render();
+                        prompt.Clear();
+                        scroll.ScrollToEnd();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (!closed)
+                    {
+                        UpdateChatMessage(streaming, streamText, true);
+                        media.Text = ex.Message;
+                    }
+                }
+                finally
+                {
+                    flush.Stop();
+                    request = null;
+                    if (!closed)
+                    {
+                        send.IsEnabled = ready;
+                        prompt.IsReadOnly = false;
+                        stop.Visibility = Visibility.Collapsed;
+                        prompt.Focus();
+                    }
+                }
+            };
+            send.Click += async (s, e) => await submit();
+            prompt.PreviewKeyDown += async (s, e) =>
+            {
+                if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+                {
+                    e.Handled = true;
+                    await submit();
+                }
+            };
+            stop.Click += async (s, e) =>
+            {
+                if (request != null)
+                {
+                    stop.IsEnabled = false;
+                    try
+                    {
+                        await Connection().Cancel(request);
+                    }
+                    catch (Exception ex)
+                    {
+                        media.Text = ex.Message;
+                    }
+                    finally
+                    {
+                        stop.IsEnabled = true;
+                    }
+                }
+            };
+            win.Closed += async (s, e) =>
+            {
+                closed = true;
+                flush.Stop();
+                if (request != null)
+                    try
+                    {
+                        await Connection().Cancel(request);
+                    }
+                    catch { }
+            };
+            if (!showcaseRendering)
+                win.Show();
+            scroll.ScrollToEnd();
+            prompt.Focus();
+            try
+            {
+                if (demo)
+                {
+                    media.Text = "示例对话 · 界面预览";
+                    ready = false;
+                }
+                else if (shot.Kind == "video" || shot.Kind == "gif")
+                {
+                    var inspection = await Connection()
+                        .Call("inspect", new Dictionary<string, object> { { "file", shot.File } });
+                    double duration = Convert.ToDouble(inspection["duration"]);
+                    media.Text =
+                        "视频 " + duration.ToString("0.0") + " 秒 · 最多采样 24 帧，不含音频";
+                    ready = duration > 0 && duration <= 600;
+                    if (!ready)
+                        media.Text = "请先将视频裁剪为 10 分钟以内。";
+                }
+                else
+                {
+                    media.Text =
+                        Backend.S(profile, "provider") == "chatgpt"
+                            ? "Using ChatGPT plan"
+                            : "回答保存在这张截图的历史中";
+                    ready = true;
+                }
+                send.IsEnabled = ready;
+            }
+            catch (Exception ex)
+            {
+                media.Text = ex.Message;
+            }
+        }
+    }
 }

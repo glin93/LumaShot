@@ -7,6 +7,13 @@ $exe=Join-Path $root 'LumaShot.Showcase.exe'
 $references=@('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Runtime.Serialization.dll','System.Web.Extensions.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll','System.Xml.dll','WPF\WindowsBase.dll','System.Xaml.dll','WPF\PresentationCore.dll','WPF\PresentationFramework.dll')
 $compilerArgs=@('/nologo','/target:winexe','/platform:x64','/optimize+','/utf8output','/main:LumaShot.ShowcaseProgram',('/out:'+$exe),('/win32icon:'+(Join-Path $root 'LumaShot.ico')))
 foreach($reference in $references){$compilerArgs+='/reference:'+(Join-Path $framework $reference)}
+$compilerArgs += "/reference:$framework\System.Runtime.WindowsRuntime.dll"
+foreach ($name in @('System.Runtime','System.Runtime.InteropServices.WindowsRuntime','System.Threading.Tasks')) {
+    $facade = Get-ChildItem "C:/Windows/Microsoft.NET/assembly/GAC_MSIL/$name" -Recurse -Filter "$name.dll" | Select-Object -First 1
+    if (-not $facade) { throw "Windows Runtime reference missing: $name" }
+    $compilerArgs += "/reference:$($facade.FullName)"
+}
+foreach ($name in @('Windows.Foundation','Windows.Storage','Windows.Graphics','Windows.Media','Windows.Globalization')) { $compilerArgs += "/reference:C:/Windows/System32/WinMetadata/$name.winmd" }
 $compilerArgs+=(Get-ChildItem -LiteralPath $root -Filter '*.cs').FullName
 $compilerArgs+=@("/reference:$root\MdXaml.dll","/reference:$root\MdXaml.Plugins.dll","/reference:$root\ICSharpCode.AvalonEdit.dll")
 $compilerArgs+=Join-Path $PSScriptRoot 'render-showcase.cs'

@@ -1,15 +1,22 @@
-param([string]$OutputName='LumaShot.exe')
+param([string]$OutputName='LumaShot.exe',[switch]$SkipCaptureHost)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 & (Join-Path $root 'restore-ui-dependencies.ps1')
 & (Join-Path $root 'build-icon.ps1')
-& (Join-Path $root 'build-capture-host.ps1')
+if (-not $SkipCaptureHost) { & (Join-Path $root 'build-capture-host.ps1') }
 [xml]$layoutCheck = [IO.File]::ReadAllText((Join-Path $root 'Main.xaml'))
 $framework = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
 $references = @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Runtime.Serialization.dll','System.Web.Extensions.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll','System.Xml.dll','WPF\WindowsBase.dll','System.Xaml.dll','WPF\PresentationCore.dll','WPF\PresentationFramework.dll')
 $compilerArgs = @('/nologo','/target:winexe','/platform:x64','/optimize+','/utf8output',"/out:$root\$OutputName","/win32manifest:$root\app.manifest","/win32icon:$root\LumaShot.ico")
 foreach ($reference in $references) { $compilerArgs += "/reference:$framework\$reference" }
 $compilerArgs += @("/reference:$root\MdXaml.dll","/reference:$root\MdXaml.Plugins.dll","/reference:$root\ICSharpCode.AvalonEdit.dll")
+$compilerArgs += "/reference:$framework\System.Runtime.WindowsRuntime.dll"
+foreach ($name in @('System.Runtime','System.Runtime.InteropServices.WindowsRuntime','System.Threading.Tasks')) {
+    $facade = Get-ChildItem "C:/Windows/Microsoft.NET/assembly/GAC_MSIL/$name" -Recurse -Filter "$name.dll" | Select-Object -First 1
+    if (-not $facade) { throw "Windows Runtime reference missing: $name" }
+    $compilerArgs += "/reference:$($facade.FullName)"
+}
+foreach ($name in @('Windows.Foundation','Windows.Storage','Windows.Graphics','Windows.Media','Windows.Globalization')) { $compilerArgs += "/reference:C:/Windows/System32/WinMetadata/$name.winmd" }
 $compilerArgs += (Get-ChildItem -LiteralPath $root -Filter '*.cs').FullName
 & "$framework\csc.exe" @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }

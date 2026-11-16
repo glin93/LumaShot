@@ -1,56 +1,381 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {spawn} from 'node:child_process';
-import {createInterface} from 'node:readline';
-import {randomBytes} from 'node:crypto';
-import {SyncStore} from '../sync.mjs';
-import {PreferenceSync,validPreference} from '../preferences.mjs';
-import {eligibleModels} from '../catalog.mjs';
-import {createCredentialProtection,keychainProtection} from '../credentials.mjs';
-import {parseDriveAuthorization} from '../cloud.mjs';
-import {prepareMedia} from '../media.mjs';
-import {run} from '../process.mjs';
-const base=path.resolve(fileURLToPath(new URL('../..',import.meta.url)));
-const root=path.resolve(process.argv[2]);await fs.mkdir(root,{recursive:true});
-const results=[];const ok=s=>{results.push('PASS '+s);console.log('PASS '+s);};
-const one={Id:'a'.repeat(32),Title:'截图',Tags:'测试',Notes:'',Created:new Date().toISOString(),Kind:'image',Star:false,Deleted:false,Width:320,Height:240,OcrText:'',AiHistory:'',File:'captures/image.png',Original:'captures/image.png',Thumb:'thumbs/image.png',SourceKey:'C:/private/local-only-path'};
-const a=new SyncStore(path.join(root,'a')),b=new SyncStore(path.join(root,'b'));
-const pa=new PreferenceSync(path.join(root,'pa')),pb=new PreferenceSync(path.join(root,'pb'));
-await pa.publish({'hotkeys.windows.recordWindow':'Ctrl+Alt+9','recording.systemAudio':'true','capture.image.copy':'true'});
-await pb.publish({'hotkeys.macos.recordWindow':'Shift+Cmd+8','recording.microphone':'false','capture.video.open':'library'});
-await fs.cp(pa.dir,pb.dir,{recursive:true});await fs.cp(pb.dir,pa.dir,{recursive:true});let av=await pa.merge(),bv=await pb.merge();assert.deepEqual(av,bv);assert.equal(bv['hotkeys.windows.recordWindow'],'Ctrl+Alt+9');assert.equal(av['hotkeys.macos.recordWindow'],'Shift+Cmd+8');ok('settings sync across devices preserves independent Windows/macOS shortcuts and audio/media preferences');
-const preferenceCount=(await fs.readdir(pa.dir)).length;await pa.publish(av);assert.equal((await fs.readdir(pa.dir)).length,preferenceCount);await pb.publish({...bv,'recording.microphone':'true'});await fs.cp(pb.dir,pa.dir,{recursive:true});av=await pa.merge();assert.equal(av['recording.microphone'],'true');const pc=new PreferenceSync(path.join(root,'pc'));await pc.publish({});await fs.cp(pa.dir,pc.dir,{recursive:true});assert.deepEqual(await pc.merge(),av);ok('settings updates converge; fresh-device defaults do not overwrite existing choices');
-assert(!validPreference('apiKey','fake-secret'));assert(!validPreference('hotkeys.device123.region','Ctrl+2'));assert(!validPreference('recording.microphone','yes'));ok('settings schema excludes credentials, device-bound shortcuts and invalid booleans');
-await a.init();await b.init();
-await fs.mkdir(path.join(a.root,'captures'),{recursive:true});await fs.mkdir(path.join(a.root,'thumbs'),{recursive:true});
-const ffmpeg=path.join(base,'engine','ffmpeg.exe');const make=await run(ffmpeg,['-f','lavfi','-i','color=c=purple:s=320x240','-frames:v','1','-y',a.local(one.File)]);assert.equal(make.code,0);await fs.copyFile(a.local(one.File),a.local(one.Thumb));
-const exchange=async(from,to)=>{await fs.cp(from.dir,to.dir,{recursive:true,force:false,errorOnExist:false});};
-await a.publish([one]);await exchange(a,b);let br=await b.merge();assert.equal(br.length,1);assert.equal(br[0].SourceKey,null);assert.equal(br[0].Title,one.Title);assert.deepEqual(await fs.readFile(b.local(br[0].File)),await fs.readFile(a.local(one.File)));ok('first-device import, media integrity, local paths excluded');
-let ar=await a.merge();const count=(await fs.readdir(path.join(a.dir,'revisions'))).length;await a.publish(ar);assert.equal((await fs.readdir(path.join(a.dir,'revisions'))).length,count);ok('sync idempotence');
-ar[0].Title='从 Windows 修改';br[0].Star=true;await a.publish(ar);await b.publish(br);await exchange(a,b);await exchange(b,a);ar=await a.merge();br=await b.merge();assert.equal(ar.length,1);assert.equal(ar[0].Title,'从 Windows 修改');assert.equal(ar[0].Star,true);assert.deepEqual(ar,br);ok('concurrent metadata changes merge by field without conflict images');
-ar[0].Title='Windows 同字段';br[0].Title='Mac 同字段';await a.publish(ar);await b.publish(br);await exchange(a,b);await exchange(b,a);ar=await a.merge();br=await b.merge();assert.equal(ar.length,1);assert.equal(ar[0].Title,br[0].Title);ok('same-field changes converge deterministically without duplicate captures');
-ar.find(x=>x.Id===one.Id).Deleted=true;await a.publish(ar);await exchange(a,b);br=await b.merge();assert.equal(br.find(x=>x.Id===one.Id).Deleted,true);assert.equal(br.length,1);ok('trash tombstone propagation without deleting originals');
-br.find(x=>x.Id===one.Id).Deleted=false;await b.publish(br);await exchange(b,a);ar=await a.merge();assert.equal(ar.find(x=>x.Id===one.Id).Deleted,false);ok('restore propagates across devices');
-const c=new SyncStore(path.join(root,'tampered'));await c.init();await exchange(a,c);const rev=(await fs.readdir(path.join(c.dir,'revisions')))[0];await fs.appendFile(path.join(c.dir,'revisions',rev),' ');await assert.rejects(()=>c.merge(),/校验/);assert.throws(()=>a.local('../outside'),/路径/);ok('tampering and path traversal refused');
-assert.deepEqual(eligibleModels('openai',['gpt-4.1','text-embedding-3-large']).map(x=>x.id),['gpt-4.1']);assert.throws(()=>eligibleModels('openai',['invented-model']));ok('account catalog intersection excludes unknown and non-image models');
-const protection=await createCredentialProtection({base,vault:path.join(root,'vault')});const secret='fake-secret-测试';const cipher=protection.encrypt(secret);assert.equal(protection.decrypt(cipher),secret);assert(!Buffer.from(cipher).includes(Buffer.from(secret)));const bad=Buffer.from(cipher);bad[bad.length-1]^=1;assert.throws(()=>protection.decrypt(bad));ok('Windows DPAPI roundtrip and tamper rejection');
-const mac=keychainProtection(randomBytes(32));const macData=mac.encrypt(secret);assert.equal(mac.decrypt(macData),secret);macData[macData.length-1]^=1;assert.throws(()=>mac.decrypt(macData));ok('cross-platform credential envelope roundtrip and tamper rejection (Keychain OS integration untested)');
-const token={access_token:'fake-access',refresh_token:'fake-refresh'};assert.deepEqual(parseDriveAuthorization(JSON.stringify(token)),token);assert.deepEqual(parseDriveAuthorization('Paste --->\n'+Buffer.from(JSON.stringify({token:JSON.stringify(token)})).toString('base64').replace(/=+$/,'')+'\nEnd'),token);ok('rclone legacy and encoded OAuth result parsing');
-const video=path.join(root,'sample.mp4');const encode=await run(ffmpeg,['-f','lavfi','-i','color=c=purple:s=320x240:r=10','-t','2','-c:v','libx264','-pix_fmt','yuv420p','-y',video]);assert.equal(encode.code,0);const frames=await prepareMedia(ffmpeg,video,true,path.join(root,'temp'));assert.equal(frames.frames.length,1);assert(frames.meta.duration>=1.9);assert(frames.frames[0].time>0);assert.equal((await fs.readdir(path.join(root,'temp'))).length,0);ok('duration/bitrate inspection, timestamped frames, temporary cleanup');
-const vault=path.join(root,'backend-vault');const child=spawn(process.execPath,['--import',new URL('./mock-http.mjs',import.meta.url).href,path.join(base,'backend','main.mjs'),a.root,vault],{windowsHide:true,stdio:['pipe','pipe','pipe']});
-const waiting=new Map();let serial=0;let raw='';let stderr='';child.stderr.on('data',x=>stderr+=x);const lines=createInterface({input:child.stdout});lines.on('line',line=>{raw+=line;const m=JSON.parse(line);if(m.event==='delta')return;const p=waiting.get(m.requestId);if(p){waiting.delete(m.requestId);clearTimeout(p.timer);m.error?p.reject(new Error(m.error)):p.resolve(m.result);}});
-child.on('exit',()=>{for(const p of waiting.values()){clearTimeout(p.timer);p.reject(new Error('Backend exited '+stderr));}waiting.clear();});
-const call=(method,args={})=>new Promise((resolve,reject)=>{const id=String(++serial);const timer=setTimeout(()=>{waiting.delete(id);reject(new Error('IPC timeout '+stderr));},20000);waiting.set(id,{resolve,reject,timer});child.stdin.write(JSON.stringify({...args,method,requestId:id})+'\n');});
-try{
- let state=await call('state');assert.equal(state.profiles.length,0);assert.equal(state.chatgptInstalled,await fs.access(path.join(base,'backend','siwc','dist','index.js')).then(()=>true,()=>false));if(!state.chatgptInstalled)await assert.rejects(()=>call('signIn'),/未安装/);ok('optional ChatGPT component is reported accurately; missing component cannot start login');
- assert.equal((await call('cancel',{target:'already-finished'})).cancelled,true);await call('state');ok('cancel leaves the backend available with or without the optional ChatGPT component');
- state=await call('addKey',{provider:'openai',key:'fake-openai-key'});const openId=state.profiles[0].id;assert.equal(state.profiles[0].model,null);await assert.rejects(()=>call('selectModel',{id:openId,model:'invented'}));await call('selectModel',{id:openId,model:'gpt-4.1'});
- state=await call('addKey',{provider:'gemini',key:'fake-gemini-key'});const gemId=state.profiles.find(x=>x.provider==='gemini').id;assert.equal(state.activeAIId,openId);assert(!raw.includes('fake-openai-key'));assert(!raw.includes('fake-gemini-key'));assert(!(await fs.readFile(path.join(vault,'settings.dpapi'))).includes(Buffer.from('fake-openai-key')));ok('multiple encrypted profiles, exactly one active, manual model choice, no key in IPC');
- const answer=await call('ask',{profileId:openId,file:one.File,prompt:'请总结',history:[]});assert.equal(answer.text,'这是测试画面的总结。');ok('OpenAI image request and streaming completed response via mock transport');
- await call('selectModel',{id:gemId,model:'gemini-2.5-flash'});await call('select',{id:gemId});await assert.rejects(()=>call('ask',{profileId:openId,file:one.File,prompt:'stale'}));const gem=await call('ask',{profileId:gemId,file:one.File,prompt:'请总结',history:[]});assert.equal(gem.text,'Gemini 测试回答。');ok('single provider routing and Gemini image request via mock transport');
- state=await call('addKey',{provider:'openai',key:'fake-incomplete'});const badId=state.profiles[state.profiles.length-1].id;await call('selectModel',{id:badId,model:'gpt-4.1'});await call('select',{id:badId});await assert.rejects(()=>call('ask',{profileId:badId,file:one.File,prompt:'测试'}),/未完成/);ok('incomplete model response never reported as success');
- await call('remove',{id:badId});state=await call('state');assert(state.profiles.some(x=>x.id===state.activeAIId));ok('removing active configuration preserves single-active invariant');
-}finally{child.stdin.end();setTimeout(()=>child.kill(),1000).unref();}
-await fs.writeFile(path.join(root,'test-results.txt'),results.join('\n')+'\n');
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { randomBytes } from "node:crypto";
+import { SyncStore, metadata } from "../sync.mjs";
+import { PreferenceSync, validPreference } from "../preferences.mjs";
+import { eligibleModels } from "../catalog.mjs";
+import {
+  createCredentialProtection,
+  keychainProtection,
+} from "../credentials.mjs";
+import { parseDriveAuthorization } from "../cloud.mjs";
+import { prepareMedia } from "../media.mjs";
+import { run } from "../process.mjs";
+const base = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
+const root = path.resolve(process.argv[2]);
+await fs.mkdir(root, { recursive: true });
+const results = [];
+const ok = (s) => {
+  results.push("PASS " + s);
+  console.log("PASS " + s);
+};
+const one = {
+  Id: "a".repeat(32),
+  Title: "截图",
+  Tags: "测试",
+  Notes: "",
+  Created: new Date().toISOString(),
+  Kind: "image",
+  Star: false,
+  Deleted: false,
+  Width: 320,
+  Height: 240,
+  OcrText: "",
+  AiHistory: "",
+  File: "captures/image.png",
+  Original: "captures/image.png",
+  Thumb: "thumbs/image.png",
+  SourceKey: "C:/private/local-only-path",
+};
+const a = new SyncStore(path.join(root, "a")),
+  b = new SyncStore(path.join(root, "b"));
+const pa = new PreferenceSync(path.join(root, "pa")),
+  pb = new PreferenceSync(path.join(root, "pb"));
+await pa.publish({
+  "hotkeys.windows.recordWindow": "Ctrl+Alt+9",
+  "recording.systemAudio": "true",
+  "capture.image.copy": "true",
+});
+await pb.publish({
+  "hotkeys.macos.recordWindow": "Shift+Cmd+8",
+  "recording.microphone": "false",
+  "capture.video.open": "library",
+});
+await fs.cp(pa.dir, pb.dir, { recursive: true });
+await fs.cp(pb.dir, pa.dir, { recursive: true });
+let av = await pa.merge(),
+  bv = await pb.merge();
+assert.deepEqual(av, bv);
+assert.equal(bv["hotkeys.windows.recordWindow"], "Ctrl+Alt+9");
+assert.equal(av["hotkeys.macos.recordWindow"], "Shift+Cmd+8");
+ok(
+  "settings sync across devices preserves independent Windows/macOS shortcuts and audio/media preferences",
+);
+const preferenceCount = (await fs.readdir(pa.dir)).length;
+await pa.publish(av);
+assert.equal((await fs.readdir(pa.dir)).length, preferenceCount);
+await pb.publish({ ...bv, "recording.microphone": "true" });
+await fs.cp(pb.dir, pa.dir, { recursive: true });
+av = await pa.merge();
+assert.equal(av["recording.microphone"], "true");
+const pc = new PreferenceSync(path.join(root, "pc"));
+await pc.publish({});
+await fs.cp(pa.dir, pc.dir, { recursive: true });
+assert.deepEqual(await pc.merge(), av);
+ok(
+  "settings updates converge; fresh-device defaults do not overwrite existing choices",
+);
+assert(!validPreference("apiKey", "fake-secret"));
+assert(!validPreference("hotkeys.device123.region", "Ctrl+2"));
+assert(!validPreference("recording.microphone", "yes"));
+ok(
+  "settings schema excludes credentials, device-bound shortcuts and invalid booleans",
+);
+await a.init();
+await b.init();
+await fs.mkdir(path.join(a.root, "captures"), { recursive: true });
+await fs.mkdir(path.join(a.root, "thumbs"), { recursive: true });
+const ffmpeg = path.join(base, "engine", "ffmpeg.exe");
+const make = await run(ffmpeg, [
+  "-f",
+  "lavfi",
+  "-i",
+  "color=c=purple:s=320x240",
+  "-frames:v",
+  "1",
+  "-y",
+  a.local(one.File),
+]);
+assert.equal(make.code, 0);
+await fs.copyFile(a.local(one.File), a.local(one.Thumb));
+const exchange = async (from, to) => {
+  await fs.cp(from.dir, to.dir, {
+    recursive: true,
+    force: false,
+    errorOnExist: false,
+  });
+};
+await a.publish([one]);
+await exchange(a, b);
+let br = await b.merge();
+assert.equal(br.length, 1);
+assert.equal(br[0].SourceKey, null);
+assert.equal(br[0].Title, one.Title);
+assert.deepEqual(
+  await fs.readFile(b.local(br[0].File)),
+  await fs.readFile(a.local(one.File)),
+);
+ok("first-device import, media integrity, local paths excluded");
+let ar = await a.merge();
+const count = (await fs.readdir(path.join(a.dir, "revisions"))).length;
+await a.publish(ar);
+assert.equal((await fs.readdir(path.join(a.dir, "revisions"))).length, count);
+assert.equal(ar[0].File, one.File);
+assert.equal((await fs.readdir(path.join(a.root, "captures"))).length, 1);
+const object = await fs.stat(
+  path.join(a.dir, "objects", a.state.assets[one.Id].File.sha),
+);
+const original = await fs.stat(a.local(one.File));
+assert.equal(object.ino, original.ino);
+ok(
+  "sync idempotence, original paths retained, media hard-linked without extra disk blocks",
+);
+ar[0].Title = "从 Windows 修改";
+br[0].Star = true;
+await a.publish(ar);
+await b.publish(br);
+await exchange(a, b);
+await exchange(b, a);
+ar = await a.merge();
+br = await b.merge();
+assert.equal(ar.length, 1);
+assert.equal(ar[0].Title, "从 Windows 修改");
+assert.equal(ar[0].Star, true);
+assert.deepEqual(ar.map(metadata), br.map(metadata));
+ok("concurrent metadata changes merge by field without conflict images");
+ar[0].Title = "Windows 同字段";
+br[0].Title = "Mac 同字段";
+await a.publish(ar);
+await b.publish(br);
+await exchange(a, b);
+await exchange(b, a);
+ar = await a.merge();
+br = await b.merge();
+assert.equal(ar.length, 1);
+assert.equal(ar[0].Title, br[0].Title);
+ok("same-field changes converge deterministically without duplicate captures");
+ar.find((x) => x.Id === one.Id).Deleted = true;
+await a.publish(ar);
+await exchange(a, b);
+br = await b.merge();
+assert.equal(br.find((x) => x.Id === one.Id).Deleted, true);
+assert.equal(br.length, 1);
+ok("trash tombstone propagation without deleting originals");
+br.find((x) => x.Id === one.Id).Deleted = false;
+await b.publish(br);
+await exchange(b, a);
+ar = await a.merge();
+assert.equal(ar.find((x) => x.Id === one.Id).Deleted, false);
+ok("restore propagates across devices");
+const c = new SyncStore(path.join(root, "tampered"));
+await c.init();
+await exchange(a, c);
+const rev = (await fs.readdir(path.join(c.dir, "revisions")))[0];
+await fs.appendFile(path.join(c.dir, "revisions", rev), " ");
+await assert.rejects(() => c.merge(), /校验/);
+assert.throws(() => a.local("../outside"), /路径/);
+ok("tampering and path traversal refused");
+assert.deepEqual(
+  eligibleModels("openai", ["gpt-4.1", "text-embedding-3-large"]).map(
+    (x) => x.id,
+  ),
+  ["gpt-4.1"],
+);
+assert.throws(() => eligibleModels("openai", ["invented-model"]));
+ok("account catalog intersection excludes unknown and non-image models");
+const protection = await createCredentialProtection({
+  base,
+  vault: path.join(root, "vault"),
+});
+const secret = "fake-secret-测试";
+const cipher = protection.encrypt(secret);
+assert.equal(protection.decrypt(cipher), secret);
+assert(!Buffer.from(cipher).includes(Buffer.from(secret)));
+const bad = Buffer.from(cipher);
+bad[bad.length - 1] ^= 1;
+assert.throws(() => protection.decrypt(bad));
+ok("Windows DPAPI roundtrip and tamper rejection");
+const mac = keychainProtection(randomBytes(32));
+const macData = mac.encrypt(secret);
+assert.equal(mac.decrypt(macData), secret);
+macData[macData.length - 1] ^= 1;
+assert.throws(() => mac.decrypt(macData));
+ok(
+  "cross-platform credential envelope roundtrip and tamper rejection (Keychain OS integration untested)",
+);
+const token = { access_token: "fake-access", refresh_token: "fake-refresh" };
+assert.deepEqual(parseDriveAuthorization(JSON.stringify(token)), token);
+assert.deepEqual(
+  parseDriveAuthorization(
+    "Paste --->\n" +
+      Buffer.from(JSON.stringify({ token: JSON.stringify(token) }))
+        .toString("base64")
+        .replace(/=+$/, "") +
+      "\nEnd",
+  ),
+  token,
+);
+ok("rclone legacy and encoded OAuth result parsing");
+const video = path.join(root, "sample.mp4");
+const encode = await run(ffmpeg, [
+  "-f",
+  "lavfi",
+  "-i",
+  "color=c=purple:s=320x240:r=10",
+  "-t",
+  "2",
+  "-c:v",
+  "libx264",
+  "-pix_fmt",
+  "yuv420p",
+  "-y",
+  video,
+]);
+assert.equal(encode.code, 0);
+const frames = await prepareMedia(ffmpeg, video, true, path.join(root, "temp"));
+assert.equal(frames.frames.length, 1);
+assert(frames.meta.duration >= 1.9);
+assert(frames.frames[0].time > 0);
+assert.equal((await fs.readdir(path.join(root, "temp"))).length, 0);
+ok("duration/bitrate inspection, timestamped frames, temporary cleanup");
+const vault = path.join(root, "backend-vault");
+const child = spawn(
+  process.execPath,
+  [
+    "--import",
+    new URL("./mock-http.mjs", import.meta.url).href,
+    path.join(base, "backend", "main.mjs"),
+    a.root,
+    vault,
+  ],
+  { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
+);
+const waiting = new Map();
+let serial = 0;
+let raw = "";
+let stderr = "";
+child.stderr.on("data", (x) => (stderr += x));
+const lines = createInterface({ input: child.stdout });
+lines.on("line", (line) => {
+  raw += line;
+  const m = JSON.parse(line);
+  if (m.event === "delta") return;
+  const p = waiting.get(m.requestId);
+  if (p) {
+    waiting.delete(m.requestId);
+    clearTimeout(p.timer);
+    m.error ? p.reject(new Error(m.error)) : p.resolve(m.result);
+  }
+});
+child.on("exit", () => {
+  for (const p of waiting.values()) {
+    clearTimeout(p.timer);
+    p.reject(new Error("Backend exited " + stderr));
+  }
+  waiting.clear();
+});
+const call = (method, args = {}) =>
+  new Promise((resolve, reject) => {
+    const id = String(++serial);
+    const timer = setTimeout(() => {
+      waiting.delete(id);
+      reject(new Error("IPC timeout " + stderr));
+    }, 20000);
+    waiting.set(id, { resolve, reject, timer });
+    child.stdin.write(
+      JSON.stringify({ ...args, method, requestId: id }) + "\n",
+    );
+  });
+try {
+  let state = await call("state");
+  assert.equal(state.profiles.length, 0);
+  assert.equal(
+    state.chatgptInstalled,
+    await fs
+      .access(path.join(base, "backend", "siwc", "dist", "index.js"))
+      .then(
+        () => true,
+        () => false,
+      ),
+  );
+  if (!state.chatgptInstalled)
+    await assert.rejects(() => call("signIn"), /未安装/);
+  ok(
+    "optional ChatGPT component is reported accurately; missing component cannot start login",
+  );
+  assert.equal(
+    (await call("cancel", { target: "already-finished" })).cancelled,
+    true,
+  );
+  await call("state");
+  ok(
+    "cancel leaves the backend available with or without the optional ChatGPT component",
+  );
+  state = await call("addKey", { provider: "openai", key: "fake-openai-key" });
+  const openId = state.profiles[0].id;
+  assert.equal(state.profiles[0].model, null);
+  await assert.rejects(() =>
+    call("selectModel", { id: openId, model: "invented" }),
+  );
+  await call("selectModel", { id: openId, model: "gpt-4.1" });
+  state = await call("addKey", { provider: "gemini", key: "fake-gemini-key" });
+  const gemId = state.profiles.find((x) => x.provider === "gemini").id;
+  assert.equal(state.activeAIId, openId);
+  assert(!raw.includes("fake-openai-key"));
+  assert(!raw.includes("fake-gemini-key"));
+  assert(
+    !(await fs.readFile(path.join(vault, "settings.dpapi"))).includes(
+      Buffer.from("fake-openai-key"),
+    ),
+  );
+  ok(
+    "multiple encrypted profiles, exactly one active, manual model choice, no key in IPC",
+  );
+  const answer = await call("ask", {
+    profileId: openId,
+    file: one.File,
+    prompt: "请总结",
+    history: [],
+  });
+  assert.equal(answer.text, "这是测试画面的总结。");
+  ok(
+    "OpenAI image request and streaming completed response via mock transport",
+  );
+  await call("selectModel", { id: gemId, model: "gemini-2.5-flash" });
+  await call("select", { id: gemId });
+  await assert.rejects(() =>
+    call("ask", { profileId: openId, file: one.File, prompt: "stale" }),
+  );
+  const gem = await call("ask", {
+    profileId: gemId,
+    file: one.File,
+    prompt: "请总结",
+    history: [],
+  });
+  assert.equal(gem.text, "Gemini 测试回答。");
+  ok("single provider routing and Gemini image request via mock transport");
+  state = await call("addKey", { provider: "openai", key: "fake-incomplete" });
+  const badId = state.profiles[state.profiles.length - 1].id;
+  await call("selectModel", { id: badId, model: "gpt-4.1" });
+  await call("select", { id: badId });
+  await assert.rejects(
+    () => call("ask", { profileId: badId, file: one.File, prompt: "测试" }),
+    /未完成/,
+  );
+  ok("incomplete model response never reported as success");
+  await call("remove", { id: badId });
+  state = await call("state");
+  assert(state.profiles.some((x) => x.id === state.activeAIId));
+  ok("removing active configuration preserves single-active invariant");
+} finally {
+  child.stdin.end();
+  setTimeout(() => child.kill(), 1000).unref();
+}
+await fs.writeFile(
+  path.join(root, "test-results.txt"),
+  results.join("\n") + "\n",
+);

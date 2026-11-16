@@ -1,0 +1,11 @@
+PASS sync preserves edits made in flight and accepts unrelated remote fields
+PASS switching records flushes edits and reuses grid controls
+PASS pending tag input is committed before leaving the record
+PASS 60-record library renders 48 then 12 cards without retaining the previous page
+PASS enabled switch is visually on before animation or first input
+PASS AI streaming keeps message header/copy action and reuses text control; stopped answer remains copyable
+PASS repeated thumbnail decode uses bounded 32 MiB cache
+PASS verified inbox source is removed after commit; manual source is retained
+PASS Windows OCR runs in process and recognizes synthetic screenshot
+PASS monitor-specific conversion handles negative origins and 150% scaling (physical multi-monitor not tested)
+PASS storage cleanup removes verified legacy poster, preserves original and backup references

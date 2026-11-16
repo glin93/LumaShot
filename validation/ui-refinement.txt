@@ -1,0 +1,13 @@
+PASS inspected library search and selection with Chinese text at desktop scaling
+PASS inspected Ask AI sample conversation, rendered Markdown, header and copy controls
+PASS visited all six settings sections: capture, shortcuts, AI, cloud, library, about
+PASS changed recording microphone preference in an isolated demo library
+PASS inspected separate macOS shortcut list without modifying production shortcuts
+PASS added a tag chip and verified immediate saved state in an isolated library
+PASS five automatic floating previews fit the available work area without native window borders
+PASS more-action button opens rounded menu; library navigation selects the intended record
+PASS quick-history search filters six records to three; Enter copies and dismisses the panel
+PASS maximized library keeps its footer above the taskbar; restore returns to normal bounds
+PASS closing hides the library; a second launch exits successfully and activates the existing process
+LIMIT paid model calls and real cloud account changes were not performed
+LIMIT mixed-DPI monitor placement has coordinate tests, not physical multi-monitor coverage

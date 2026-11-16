@@ -1,19 +1,87 @@
 using System;
 using System.IO;
-using System.Diagnostics;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Windows.Graphics.Imaging;
+using Windows.Media.Ocr;
+using Windows.Storage;
 
-namespace LumaShot {
- public static class LocalOcr {
-  public static async Task<string> Read(Library lib,Shot item){
-   string stem=Path.Combine(lib.Root,"ocr-"+Guid.NewGuid().ToString("N")),png=stem+".png",txt=stem+".txt";
-   var img=Images.Load(lib.Full(item.File));double scale=Math.Min(1,2400.0/Math.Max(img.PixelWidth,img.PixelHeight));if(scale<1)img=new TransformedBitmap(img,new ScaleTransform(scale,scale));Images.Save(img,png);
-   string exe=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"System32","WindowsPowerShell","v1.0","powershell.exe");string script=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"LocalOcr.ps1");
-   try{var p=new Process{StartInfo=new ProcessStartInfo(exe,"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \""+script+"\" -ImagePath \""+png+"\" -OutputPath \""+txt+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true}};
-    p.Start();var error=p.StandardError.ReadToEndAsync();var output=p.StandardOutput.ReadToEndAsync();var wait=Task.Run(()=>p.WaitForExit());if(await Task.WhenAny(wait,Task.Delay(30000))!=wait){p.Kill();p.Dispose();throw new IOException("文字识别超时，请缩小截图后重试。");}await wait;string err=await error;await output;int exit=p.ExitCode;p.Dispose();if(exit!=0||!File.Exists(txt))throw new IOException("本地文字识别未完成。请确认 Windows 已安装所需语言。\n"+err);return File.ReadAllText(txt);
-   }finally{if(File.Exists(png))File.Delete(png);if(File.Exists(txt))File.Delete(txt);}
-  }
- }
+namespace LumaShot
+{
+    public static class LocalOcr
+    {
+        static readonly SemaphoreSlim gate = new SemaphoreSlim(1, 1);
+
+        // Windows handles OCR in process; no PowerShell startup per capture.
+        public static async Task<string> Read(Library lib, Shot item)
+        {
+            await gate.WaitAsync();
+            try
+            {
+                return await Task.Run(async () =>
+                {
+                    var engine = OcrEngine.TryCreateFromUserProfileLanguages();
+                    if (engine == null)
+                        throw new IOException("请在 Windows 中安装所需的 OCR 语言。");
+                    var file = await Await<StorageFile>(
+                        StorageFile.GetFileFromPathAsync(lib.Full(item.File))
+                    );
+                    using (
+                        var stream = await Await<Windows.Storage.Streams.IRandomAccessStream>(
+                            file.OpenAsync(FileAccessMode.Read)
+                        )
+                    )
+                    {
+                        var decoder = await Await<BitmapDecoder>(BitmapDecoder.CreateAsync(stream));
+                        double scale = Math.Min(
+                            1,
+                            Math.Min(2400, OcrEngine.MaxImageDimension)
+                                / (double)Math.Max(decoder.PixelWidth, decoder.PixelHeight)
+                        );
+                        var transform = new BitmapTransform
+                        {
+                            ScaledWidth = Math.Max(1, (uint)(decoder.PixelWidth * scale)),
+                            ScaledHeight = Math.Max(1, (uint)(decoder.PixelHeight * scale)),
+                        };
+                        using (
+                            var bitmap = await Await<SoftwareBitmap>(
+                                decoder.GetSoftwareBitmapAsync(
+                                    BitmapPixelFormat.Bgra8,
+                                    BitmapAlphaMode.Premultiplied,
+                                    transform,
+                                    ExifOrientationMode.IgnoreExifOrientation,
+                                    ColorManagementMode.DoNotColorManage
+                                )
+                            )
+                        )
+                        {
+                            var result = await Await<OcrResult>(engine.RecognizeAsync(bitmap));
+                            return string.Join(
+                                Environment.NewLine,
+                                result.Lines.Select(x => x.Text)
+                            );
+                        }
+                    }
+                });
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        static Task<T> Await<T>(object operation)
+        {
+            var method = typeof(System.WindowsRuntimeSystemExtensions)
+                .GetMethods()
+                .First(x =>
+                    x.Name == "AsTask"
+                    && x.IsGenericMethod
+                    && x.GetParameters().Length == 1
+                    && x.GetParameters()[0].ParameterType.Name == "IAsyncOperation`1"
+                );
+            return (Task<T>)method.MakeGenericMethod(typeof(T)).Invoke(null, new[] { operation });
+        }
+    }
 }

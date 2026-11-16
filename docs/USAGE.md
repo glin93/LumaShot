@@ -12,9 +12,9 @@ Shortcuts use one configuration per platform, shared across that platform's devi
 
 ## Library / 资料库
 
-The default location is `%LOCALAPPDATA%\LumaShot\Library`. Each saved edit creates a new file and record. Dismissing a floating preview does not remove its history record. The library supports ZIP backup and merge restore.
+The default location is `%LOCALAPPDATA%\LumaShot\Library`. Each saved edit creates a new file and record. Each floating preview disappears after 15 seconds independently; later captures do not extend it. When the screen is full, the oldest preview is removed first. Dismissing a preview does not remove its history record or clear the clipboard. The library supports ZIP backup and merge restore.
 
-默认位置为 `%LOCALAPPDATA%\LumaShot\Library`。每次保存编辑都会创建新文件与记录；关闭浮窗不会删除历史。资料库支持 ZIP 备份和合并恢复。
+默认位置为 `%LOCALAPPDATA%\LumaShot\Library`。每次保存编辑都会创建新文件与记录。浮窗每张独立保留 15 秒，后续截图不延长已有浮窗的时间；屏幕放不下时先移除最早的一张。浮窗消失不删除历史，也不清空剪贴板。资料库支持 ZIP 备份和合并恢复。
 
 ```powershell
 # Use a separate library / 指定独立资料库

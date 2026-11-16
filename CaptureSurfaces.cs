@@ -26,6 +26,10 @@ namespace LumaShot
         TextBox quickSearch;
         TextBlock quickCount;
         readonly List<string> pendingCards = new List<string>();
+        readonly CapturePreviewLifetime previewLifetime = new CapturePreviewLifetime();
+        readonly System.Diagnostics.Stopwatch previewClock =
+            System.Diagnostics.Stopwatch.StartNew();
+        DispatcherTimer previewExpiryTimer;
         bool surfacesSuspended,
             capturing;
         Rect railArea;
@@ -120,6 +124,16 @@ namespace LumaShot
                 Padding = new Thickness(0, 4, 0, 8),
             };
             captureRail.Content = railScroll;
+            previewExpiryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            previewExpiryTimer.Tick += (s, e) =>
+            {
+                if (
+                    pendingCards.RemoveAll(id =>
+                        previewLifetime.IsExpired(id, previewClock.Elapsed.TotalSeconds)
+                    ) > 0
+                )
+                    RenderRail();
+            };
             captureRail.PreviewKeyDown += (s, e) =>
             {
                 if (e.Key == Key.Escape)
@@ -135,7 +149,7 @@ namespace LumaShot
                 {
                     e.Cancel = true;
                     pendingCards.Clear();
-                    captureRail.Hide();
+                    RenderRail();
                 }
             };
         }
@@ -145,8 +159,13 @@ namespace LumaShot
             if (shot == null || shot.Deleted)
                 return;
             EnsureRail();
+            pendingCards.RemoveAll(id =>
+                previewLifetime.IsExpired(id, previewClock.Elapsed.TotalSeconds)
+            );
+            previewLifetime.Retain(pendingCards);
             pendingCards.Remove(shot.Id);
             pendingCards.Add(shot.Id);
+            previewLifetime.Add(shot.Id, previewClock.Elapsed.TotalSeconds);
             if (railArea.IsEmpty || railArea.Width == 0)
             {
                 railScreen = F.Screen.FromPoint(F.Cursor.Position);
@@ -165,12 +184,19 @@ namespace LumaShot
         {
             if (captureRail == null)
                 return;
+            pendingCards.RemoveAll(id =>
+                previewLifetime.IsExpired(id, previewClock.Elapsed.TotalSeconds)
+            );
             pendingCards.RemoveAll(id => !lib.Items.Any(x => x.Id == id && !x.Deleted));
             FitCaptureCards(
                 pendingCards,
                 id => CaptureTileHeight(lib.Items.First(x => x.Id == id)) + 18,
                 railArea.Height - 24
             );
+            previewLifetime.Retain(pendingCards);
+            foreach (FrameworkElement card in railItems.Children)
+                if (card.ContextMenu != null)
+                    card.ContextMenu.IsOpen = false;
             railItems.Children.Clear();
             foreach (string id in pendingCards)
             {
@@ -179,9 +205,11 @@ namespace LumaShot
             }
             if (pendingCards.Count == 0)
             {
+                previewExpiryTimer.Stop();
                 captureRail.Hide();
                 return;
             }
+            previewExpiryTimer.Start();
             double height = Math.Min(
                 railArea.Height - 24,
                 12
@@ -868,6 +896,8 @@ namespace LumaShot
 
         void CloseSurfaces()
         {
+            if (previewExpiryTimer != null)
+                previewExpiryTimer.Stop();
             if (captureRail != null)
                 captureRail.Close();
             if (quickHistory != null)

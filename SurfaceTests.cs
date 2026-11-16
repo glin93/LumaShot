@@ -92,6 +92,12 @@ namespace LumaShot
                 File.SetLastWriteTime(path, DateTime.Now.AddMinutes(-2).AddSeconds(i));
             }
             await Scan();
+            // The normal inbox poll retries files temporarily locked by another process.
+            for (int attempt = 0; lib.Items.Count < 12 && attempt < 5; attempt++)
+            {
+                await Task.Delay(250);
+                await Scan();
+            }
             SurfaceChecks.Require(lib.Items.Count == 12, "burst archive count");
             SurfaceChecks.Require(
                 await SurfaceChecks.ClipboardRed() == 12,
@@ -125,6 +131,41 @@ namespace LumaShot
             SurfaceChecks.Require(nine.Count == 9, "larger screen should retain nine cards");
             results.Add(
                 "PASS capacity follows available height: five cards at 820, nine at 1450 logical pixels"
+            );
+            var lifetime = new CapturePreviewLifetime();
+            lifetime.Add("first", 0);
+            SurfaceChecks.Require(
+                !lifetime.IsExpired("first", 14.999) && lifetime.IsExpired("first", 15),
+                "single capture expires at 15 seconds"
+            );
+            lifetime.Add("second", 5);
+            lifetime.Add("third", 10);
+            SurfaceChecks.Require(
+                lifetime.IsExpired("first", 15)
+                    && !lifetime.IsExpired("second", 19.999)
+                    && lifetime.IsExpired("second", 20)
+                    && !lifetime.IsExpired("third", 24.999)
+                    && lifetime.IsExpired("third", 25),
+                "continuous captures must each expire independently after fifteen seconds"
+            );
+            lifetime.Add("separate", 15.001);
+            SurfaceChecks.Require(
+                lifetime.IsExpired("third", 25)
+                    && !lifetime.IsExpired("separate", 25)
+                    && lifetime.IsExpired("separate", 30.001),
+                "a later capture must also have its own deadline"
+            );
+            lifetime.Retain(new[] { "separate" });
+            lifetime.Add("newest", 16);
+            SurfaceChecks.Require(
+                lifetime.IsExpired("separate", 30.001)
+                    && !lifetime.IsExpired("newest", 30.999)
+                    && lifetime.IsExpired("newest", 31)
+                    && !lifetime.IsExpired("first", 100),
+                "dismissed and evicted cards leave the lifetime state and cannot reappear"
+            );
+            results.Add(
+                "PASS independent 15-second deadlines, no extension by subsequent captures, and dismissal/eviction cleanup"
             );
             var state = Backend
                 .Json()
@@ -228,6 +269,36 @@ namespace LumaShot
             ResumeSurfaces();
             HideQuickHistory();
             SurfaceChecks.Require(captureRail.IsVisible, "previews return after capture");
+            pendingCards.Clear();
+            RenderRail();
+            AddCaptureCard(shot);
+            await Task.Delay(3000);
+            var laterShot = lib.Items.First(x => x.Id != shot.Id);
+            AddCaptureCard(laterShot);
+            await Task.Delay(12600);
+            SurfaceChecks.Require(
+                pendingCards.Count == 1 && pendingCards[0] == laterShot.Id && captureRail.IsVisible,
+                "the first card expires alone while a capture three seconds later remains visible"
+            );
+            await Task.Delay(2800);
+            SurfaceChecks.Require(
+                pendingCards.Count == 0 && !captureRail.IsVisible && !previewExpiryTimer.IsEnabled,
+                "real dispatcher timer must dismiss previews and stop when idle"
+            );
+            SurfaceChecks.Require(
+                await SurfaceChecks.ClipboardRed() == 39
+                    && lib.Items.Count == 12
+                    && lib.Items.All(x => File.Exists(lib.Full(x.File))),
+                "expiry must preserve the clipboard and archived captures"
+            );
+            ResumeSurfaces();
+            SurfaceChecks.Require(
+                !captureRail.IsVisible,
+                "resuming capture surfaces must not revive expired previews"
+            );
+            results.Add(
+                "PASS real staggered timers dismiss cards individually after 15 seconds, stop when idle, preserve history/files/clipboard, and do not revive cards on resume"
+            );
         }
 
         internal void FinishSurfaceCheck()

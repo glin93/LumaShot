@@ -1,3 +1,10 @@
+# 0.1.3
+
+- 截后浮窗每张独立保留 15 秒，到期逐张消失；连续截图不延长已有浮窗的时间。
+- 屏幕容量不足时仍先移除最早的浮窗；浮窗消失不删除历史记录，也不清空剪贴板。
+- Each capture preview expires independently after 15 seconds. Subsequent captures do not extend earlier previews.
+- Screen capacity still evicts the oldest preview first. Expiration preserves archived captures and the clipboard.
+
 # 0.1.2
 
 - 统一矢量图标、窗口边框和菜单样式，简化浮窗操作；快速历史加入搜索提示，标签支持直接添加和移除。

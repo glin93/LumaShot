@@ -4,7 +4,7 @@
 [Setup]
 AppId={{E5808125-1FD8-4B6C-8568-03B55559D677}
 AppName=LumaShot
-AppVersion=0.1.2
+AppVersion=0.1.3
 AppPublisher=glin93
 AppPublisherURL=https://github.com/glin93/LumaShot
 AppSupportURL=https://github.com/glin93/LumaShot/issues
@@ -17,7 +17,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19045
 OutputDir=..\release
-OutputBaseFilename=LumaShot-0.1.2-Setup-x64
+OutputBaseFilename=LumaShot-0.1.3-Setup-x64
 SetupIconFile={#AppSource}\LumaShot.ico
 UninstallDisplayIcon={app}\LumaShot.exe
 LicenseFile={#AppSource}\LICENSE

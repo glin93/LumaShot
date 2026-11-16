@@ -208,7 +208,7 @@ namespace LumaShot
                 caption.Margin = new Thickness(14, 0, 0, 26);
                 DockPanel.SetDock(caption, Dock.Top);
                 sidebar.Children.Add(caption);
-                var version = Help("LumaShot 0.1.2");
+                var version = Help("LumaShot 0.1.3");
                 version.Margin = new Thickness(14, 15, 0, 0);
                 DockPanel.SetDock(version, Dock.Bottom);
                 sidebar.Children.Add(version);
@@ -534,7 +534,7 @@ namespace LumaShot
             );
             if (about)
             {
-                var card = Section("LumaShot 0.1.2", "Windows 版");
+                var card = Section("LumaShot 0.1.3", "Windows 版");
                 card.Children.Add(
                     Btn(
                         "开源项目",

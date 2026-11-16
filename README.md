@@ -6,7 +6,7 @@ A Windows screenshot and screen recording app with a persistent library, floatin
 
 **English** · [简体中文](README.zh-CN.md)
 
-[Download v0.1.2](https://github.com/glin93/LumaShot/releases/tag/v0.1.2) · [Report an issue](https://github.com/glin93/LumaShot/issues)
+[Download v0.1.3](https://github.com/glin93/LumaShot/releases/tag/v0.1.3) · [Report an issue](https://github.com/glin93/LumaShot/issues)
 
 ![LumaShot capture library](docs/images/library.png)
 
@@ -33,9 +33,9 @@ A Windows screenshot and screen recording app with a persistent library, floatin
 
 ## Install
 
-Download **LumaShot-0.1.2-Setup-x64.exe** from [Releases](https://github.com/glin93/LumaShot/releases). The installer includes the required runtimes and installs for the current user.
+Download **LumaShot-0.1.3-Setup-x64.exe** from [Releases](https://github.com/glin93/LumaShot/releases). The installer includes the required runtimes and installs for the current user.
 
-**Requirements:** Windows 10 22H2 or Windows 11, x64. The v0.1.2 installer is unsigned.
+**Requirements:** Windows 10 22H2 or Windows 11, x64. The v0.1.3 installer is unsigned.
 
 ChatGPT sign-in is an optional installer component. Selecting it opens its separate noncommercial license for acceptance. OpenAI and Gemini API keys work without this component.
 

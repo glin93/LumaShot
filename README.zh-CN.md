@@ -6,7 +6,7 @@ Windows 截图与录屏工具，集成长期历史记录、截后浮窗、图像
 
 [English](README.md) · **简体中文**
 
-[下载 v0.1.2](https://github.com/glin93/LumaShot/releases/tag/v0.1.2) · [反馈问题](https://github.com/glin93/LumaShot/issues)
+[下载 v0.1.3](https://github.com/glin93/LumaShot/releases/tag/v0.1.3) · [反馈问题](https://github.com/glin93/LumaShot/issues)
 
 ![LumaShot 截图资料库](docs/images/library.png)
 
@@ -33,9 +33,9 @@ Windows 截图与录屏工具，集成长期历史记录、截后浮窗、图像
 
 ## 安装
 
-从 [Releases](https://github.com/glin93/LumaShot/releases) 下载 **LumaShot-0.1.2-Setup-x64.exe**。安装包包含所需运行环境，安装到当前用户目录。
+从 [Releases](https://github.com/glin93/LumaShot/releases) 下载 **LumaShot-0.1.3-Setup-x64.exe**。安装包包含所需运行环境，安装到当前用户目录。
 
-**系统要求**：Windows 10 22H2 或 Windows 11，x64。v0.1.2 安装包尚未签名。
+**系统要求**：Windows 10 22H2 或 Windows 11，x64。v0.1.3 安装包尚未签名。
 
 ChatGPT 登录是可选安装组件，勾选后需阅读并接受其独立的非商业许可证。不安装该组件也可使用 OpenAI、Gemini 自带 Key。
 

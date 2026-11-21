@@ -80,7 +80,9 @@ namespace LumaShot
                     },
                     CaptureSettings = new
                     {
+                        ShowCursor = false,
                         ScreenRecordUseNative = true,
+                        ScreenRecordShowCursor = true,
                         ScreenRecordShowBar = duration == 0,
                         ScreenRecordFixedDuration = duration > 0,
                         ScreenRecordDuration = duration,
@@ -247,6 +249,13 @@ namespace LumaShot
             get { return active || (Running != null && !Running.HasExited); }
         }
 
+        public void CancelActiveCapture()
+        {
+            var host = resident;
+            if (host != null && host.Alive)
+                host.Cancel();
+        }
+
         public async Task Run(string action, string file = null, int duration = 0)
         {
             if (Busy)
@@ -274,6 +283,7 @@ namespace LumaShot
                     Running = resident.Process;
                     try
                     {
+                        Native.AllowSetForegroundWindow(Running.Id);
                         using (var branding = new EngineBranding(Running))
                             await resident.Capture(action);
                     }
@@ -318,6 +328,7 @@ namespace LumaShot
                 WorkingDirectory = Folder,
             };
             var process = Process.Start(si);
+            Native.AllowSetForegroundWindow(process.Id);
             Running = process;
             try
             {

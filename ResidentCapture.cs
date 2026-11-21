@@ -108,8 +108,11 @@ namespace LumaShot
             }
             try
             {
-                Process.StandardInput.WriteLine(action);
-                Process.StandardInput.Flush();
+                lock (gate)
+                {
+                    Process.StandardInput.WriteLine(action);
+                    Process.StandardInput.Flush();
+                }
                 await completion.Task;
             }
             finally
@@ -119,6 +122,21 @@ namespace LumaShot
                     if (ReferenceEquals(pending, completion))
                         pending = null;
                 }
+            }
+        }
+
+        internal void Cancel()
+        {
+            lock (gate)
+            {
+                if (disposed || pending == null || !Alive)
+                    return;
+                try
+                {
+                    Process.StandardInput.WriteLine("CANCEL");
+                    Process.StandardInput.Flush();
+                }
+                catch { }
             }
         }
 

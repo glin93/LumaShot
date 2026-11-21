@@ -85,6 +85,25 @@ namespace LumaShot
                                 + " ms"
                         );
                     }
+                    int beforeEsc = Directory
+                        .GetFiles(engine.Inbox, "*.png", SearchOption.AllDirectories)
+                        .Length;
+                    var escCapture = engine.Run("RectangleRegion");
+                    await Task.Delay(350);
+                    engine.CancelActiveCapture();
+                    await Bounded(escCapture);
+                    Check(
+                        !engine.Busy
+                            && engine.Running == null
+                            && engine.Resident.Process.Id == pid
+                            && Directory
+                                .GetFiles(engine.Inbox, "*.png", SearchOption.AllDirectories)
+                                .Length == beforeEsc,
+                        "Esc cancel pipe did not cleanly close region selector"
+                    );
+                    results.Add(
+                        "PASS ESC/CANCEL command cleanly cancels active RectangleRegion without restarting resident host"
+                    );
                     int beforeBurst = Directory
                         .GetFiles(engine.Inbox, "*.png", SearchOption.AllDirectories)
                         .Length;

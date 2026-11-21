@@ -1,54 +1,51 @@
-<p align="center"><img src="LumaShot-icon.png" width="80" alt="LumaShot" /></p>
+<p align="center">
+  <img src="LumaShot-icon.png" width="84" alt="LumaShot" />
+</p>
 
-# LumaShot
+<h1 align="center">LumaShot</h1>
 
-A Windows screenshot and screen recording app with a persistent library, floating previews, annotation, cloud sync, and AI image questions.
+<p align="center">
+  <strong>A modern, local-first screenshot, screen recording, and visual knowledge workflow for Windows.</strong><br />
+  Instant floating previews, built-in offline OCR, non-destructive annotation, conflict-free cloud sync, and streaming Ask AI — all in one fast desktop app.
+</p>
 
-**English** · [简体中文](README.zh-CN.md)
-
-[Download v0.1.3](https://github.com/glin93/LumaShot/releases/tag/v0.1.3) · [Report an issue](https://github.com/glin93/LumaShot/issues)
+<p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+  &nbsp;|&nbsp;
+  <a href="https://github.com/glin93/LumaShot/releases/tag/v0.1.4">Download v0.1.4</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="https://github.com/glin93/LumaShot/issues">Issues</a>
+</p>
 
 ![LumaShot capture library](docs/images/library.png)
 
-## Features
+## Why LumaShot
 
-- **Capture and record.** Capture a region, window, or full screen. Record microphone and system audio independently, with saved preferences.
-- **Floating previews.** Recent captures stack along the left edge. Copy, save, annotate, pin, or dismiss a capture directly. The stack adapts to the available screen height.
-- **Persistent history.** Browse a quick history panel or open the full library. Search titles, tags, notes, and OCR text; organize favorites and restore deleted items.
-- **Originals preserved.** Each saved edit creates a new image linked to its original.
-- **Cloud sync.** Automatically merge captures and settings through Google Drive or WebDAV. Shortcut configurations are shared by platform.
-- **Ask AI.** Ask questions about screenshots or sampled video frames using OpenAI or Gemini. Save multiple connections, choose a model from the list, and keep one connection active at a time.
+- **Instant, Clean Capture** — A prewarmed capture engine opens the crosshair immediately with zero startup lag. Static screenshots automatically hide mouse arrows and hand cursors for crisp captures, while screen recordings preserve cursor motion. Press `Esc` at any moment to cancel cleanly.
+- **Smart Floating Previews** — Recent captures stack neatly along the left edge with dark translucent quick actions: copy, annotate, ask AI, pin, or drag and drop directly into any app. Each preview auto-dismisses independently after 15 seconds and pauses while you hover, drag, or open its menu.
+- **Permanent Searchable Library & Quick History** — Press `Ctrl + Shift + H` for a fast top-edge history strip or `Ctrl + Shift + L` for the full library. Built-in offline Windows OCR automatically indexes text inside every screenshot, paired with interactive tag chips, searchable notes, favorites, and reversible trash.
+- **Non-Destructive Annotation & Pinning** — Every saved edit creates a new linked version so your original capture is never overwritten. Pin any screenshot above your workspace for effortless side-by-side reference.
+- **Flexible Screen Recording & GIF Export** — Record a region, window, or full screen with independent toggles for system audio and microphone, plus one-click GIF conversion.
+- **Ask AI on Any Screenshot or Video** — Streaming multimodal Q&A powered by your own OpenAI or Gemini API key, with automatic frame sampling for recordings and Markdown conversations saved right alongside each capture.
+- **Local-First & Conflict-Free Cloud Sync** — Your captures live as plain local files with one-click ZIP backup and merge restore. Enable optional two-way sync via your own Google Drive or WebDAV (NAS / Nextcloud) with local credentials protected by Windows DPAPI.
 
-## Screenshots
+## Interface Gallery
 
-| Floating previews | Quick history |
+| Floating Previews | Quick History |
 | --- | --- |
-| ![Five recent captures with copy, edit, AI, and more actions](docs/images/floating-previews.png) | ![Floating quick history with thumbnails and search](docs/images/quick-history.png) |
-
-*Illustrated with sample content rendered from the app's interface.*
+| ![Floating capture previews with quick actions](docs/images/floating-previews.png) | ![Top-edge quick history strip with instant search](docs/images/quick-history.png) |
 
 | Settings | Ask AI |
 | --- | --- |
-| ![Capture and recording preferences](docs/images/settings.png) | ![A screenshot conversation with formatted answers](docs/images/ask-ai.png) |
+| ![Capture, recording, and preference settings](docs/images/settings.png) | ![Streaming Ask AI conversation on a screenshot](docs/images/ask-ai.png) |
 
-## Install
+## Quick Start
 
-Download **LumaShot-0.1.3-Setup-x64.exe** from [Releases](https://github.com/glin93/LumaShot/releases). The installer includes the required runtimes and installs for the current user.
+1. **Capture** — Press `Ctrl + Shift + 2` to grab a region (screenshots are copied to your clipboard automatically).
+2. **Act** — Copy, annotate, pin, ask AI, or drag directly out of the left-edge floating preview.
+3. **Find anything later** — Press `Ctrl + Shift + H` for Quick History or `Ctrl + Shift + L` to open the full Library and search titles, tags, notes, or OCR text.
 
-**Requirements:** Windows 10 22H2 or Windows 11, x64. The v0.1.3 installer is unsigned.
-
-ChatGPT sign-in is an optional installer component. Selecting it opens its separate noncommercial license for acceptance. OpenAI and Gemini API keys work without this component.
-
-## Quick start
-
-1. Press **Ctrl + Shift + 2** to capture a region.
-2. Use the floating preview to copy, save, or edit it. Images are copied automatically by default.
-3. Press **Ctrl + Shift + H** for quick history, or **Ctrl + Shift + L** for the library.
-4. Open **Settings** to change shortcuts, recording audio, capture actions, and connections.
-
-Closing the library keeps LumaShot in the system tray. Choose **Exit LumaShot** to quit.
-
-| Action | Default shortcut |
+| Action | Default Shortcut |
 | --- | --- |
 | Region screenshot | `Ctrl + Shift + 2` |
 | Window screenshot | `Ctrl + Shift + 4` |
@@ -59,25 +56,31 @@ Closing the library keeps LumaShot in the system tray. Choose **Exit LumaShot** 
 | Quick history | `Ctrl + Shift + H` |
 | Library | `Ctrl + Shift + L` |
 
-All shortcuts are configurable. Microphone recording is off by default; system audio is on. Image and video completion actions are configured separately.
+All shortcuts can be customized in **Settings**. Closing the Library keeps LumaShot ready in the system tray; choose **Exit LumaShot** from the tray or sidebar to quit.
 
-## Build from source
+## Installation
 
-The Windows app uses C# / WPF, ShareX for capture and annotation, FFmpeg for media processing, a Node.js backend, and rclone for cloud transfers.
+Download **[LumaShot-0.1.4-Setup-x64.exe](https://github.com/glin93/LumaShot/releases/tag/v0.1.4)** from [Releases](https://github.com/glin93/LumaShot/releases). The installer bundles all required runtimes and installs cleanly for the current user on **Windows 10 (22H2+)** and **Windows 11 (x64)**.
 
-Run in PowerShell from the repository root:
+> **Notes:** The v0.1.4 installer is currently unsigned (Windows SmartScreen may ask for confirmation on first run). ChatGPT sign-in is an optional installer component with its own noncommercial license; OpenAI and Gemini API keys work out of the box without installing it.
+
+## Build from Source
+
+LumaShot combines a native C# / WPF desktop UI, ShareX capture and annotation engine, FFmpeg media processing, a Node.js backend for AI and sync, and rclone for cloud storage transfers.
+
+Run in PowerShell from the repository root to fetch checksum-pinned dependencies, install npm packages, and build:
 
 ```powershell
 ./bootstrap-windows.ps1
 ```
 
-This downloads checksum-pinned dependencies, installs the npm lockfile, and builds the app with the Windows .NET Framework compiler. For subsequent builds:
+For subsequent incremental builds:
 
 ```powershell
 ./build.ps1
 ```
 
-To build the installer, install Inno Setup 7.1.1 and run:
+To package the installer (requires Inno Setup 7.1.1):
 
 ```powershell
 ./build-installer.ps1 -Compiler 'C:\path\to\Inno Setup\ISCC.exe'
@@ -93,4 +96,4 @@ To build the installer, install Inno Setup 7.1.1 and run:
 
 ## License
 
-LumaShot's own code is licensed under [GPL-3.0-only](LICENSE). Third-party components retain their respective licenses. The optional [ChatGPT sign-in component](backend/siwc/LICENSE) has a separate noncommercial license.
+LumaShot's own code is licensed under [GPL-3.0-only](LICENSE). Third-party components retain their respective licenses. The optional [ChatGPT sign-in component](backend/siwc/LICENSE) carries a separate noncommercial license.

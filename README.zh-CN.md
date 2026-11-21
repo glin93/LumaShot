@@ -1,52 +1,49 @@
-<p align="center"><img src="LumaShot-icon.png" width="80" alt="LumaShot" /></p>
+<p align="center">
+  <img src="LumaShot-icon.png" width="84" alt="LumaShot" />
+</p>
 
-# LumaShot
+<h1 align="center">LumaShot</h1>
 
-Windows 截图与录屏工具，集成长期历史记录、截后浮窗、图像标注、云同步和 AI 图像问答。
+<p align="center">
+  <strong>专为 Windows 打造的现代本地优先截图、录屏与视觉资料库工作流。</strong><br />
+  即用即走的截后浮窗、离线 OCR 全文检索、原图无损标注、无冲突云同步与流式 Ask AI —— 集速度、颜值与掌控感于一体。
+</p>
 
-[English](README.md) · **简体中文**
-
-[下载 v0.1.3](https://github.com/glin93/LumaShot/releases/tag/v0.1.3) · [反馈问题](https://github.com/glin93/LumaShot/issues)
+<p align="center">
+  <a href="README.md">English</a> · <strong>简体中文</strong>
+  &nbsp;|&nbsp;
+  <a href="https://github.com/glin93/LumaShot/releases/tag/v0.1.4">下载 v0.1.4</a> ·
+  <a href="CHANGELOG.md">更新日志</a> ·
+  <a href="https://github.com/glin93/LumaShot/issues">反馈问题</a>
+</p>
 
 ![LumaShot 截图资料库](docs/images/library.png)
 
-## 功能
+## 为什么选择 LumaShot
 
-- **截图与录屏**：支持区域、窗口和全屏；麦克风与机内声音分别设置，自动记忆。
-- **截后浮窗**：截图在屏幕左侧排列，可直接复制、保存、编辑、贴图或关闭。显示数量随屏幕可用高度调整。
-- **长期历史**：快速历史浮窗与完整资料库；按标题、标签、备注和 OCR 文字搜索，支持收藏与回收站。
-- **保留原图**：每次保存编辑都会生成新图片，并关联原始记录。
-- **云同步**：Google Drive、WebDAV 自动双向合并截图与设置，快捷键按平台同步。
-- **AI 问答**：使用 OpenAI 或 Gemini 对截图、视频采样画面提问。可保存多个连接，从列表选择模型，同一时间启用一个方案。
+- **即按即截，画面干净** — 预热常驻捕获引擎，按下快捷键毫秒级拉起选区。静态截图自动隐藏箭头与手型等鼠标光标，屏幕录制则自然保留鼠标轨迹；随时按 `Esc` 即可干脆取消。
+- **高颜值智能截后浮窗** — 截完图自动停靠在屏幕左侧，悬停浮现半透明暗色胶囊操作栏：一键复制、标注编辑、Ask AI、屏幕贴图，或直接把图片拖入聊天与文档应用。每张浮窗独立 15 秒自动收起，鼠标悬停、打开菜单或拖拽时自动暂停计时。
+- **永久资料库与顶部快速历史** — 按 `Ctrl + Shift + H` 呼出顶部快速历史条，按 `Ctrl + Shift + L` 打开完整资料库。内置本地离线 Windows OCR 自动提取图中文字，配合可视化标签胶囊、可搜索备注、收藏夹与可恢复回收站，再多截图也能秒级找回。
+- **非破坏式编辑与屏幕贴图** — 每次保存标注都会生成关联原图的新版本，历史原图永不被覆盖；支持将任意截图置顶贴在屏幕前端对照参考。
+- **灵活录屏与一键转 GIF** — 支持区域、窗口与全屏录制，独立开关机内声音与麦克风并记忆偏好，支持直接将录屏导出为 GIF 动图。
+- **多模态流式 Ask AI** — 使用你自己的 OpenAI 或 Gemini API Key，对任意截图或长录屏（自动均匀抽帧）进行流式对话，Markdown 回答直接保存在对应记录的上下文历史中。
+- **本地优先与无冲突云同步** — 截图与历史索引以明晰的本地文件保存，支持一键 ZIP 备份与合并恢复；可选开启 Google Drive 或 WebDAV（NAS / Nextcloud）双向增量同步，凭证通过 Windows DPAPI 本机加密。
 
 ## 界面展示
 
 | 截后浮窗 | 快速历史 |
 | --- | --- |
-| ![五张截后浮窗，可直接复制、保存、编辑与问 AI](docs/images/floating-previews.png) | ![带缩略图与搜索的快速历史浮窗](docs/images/quick-history.png) |
-
-*使用应用界面与虚构内容生成的展示图。*
+| ![截后浮窗与快捷操作](docs/images/floating-previews.png) | ![带实时搜索的顶部快速历史](docs/images/quick-history.png) |
 
 | 设置 | Ask AI |
 | --- | --- |
-| ![截图、录屏与声音设置](docs/images/settings.png) | ![带格式化回答的截图对话](docs/images/ask-ai.png) |
+| ![截图、录屏与音频偏好设置](docs/images/settings.png) | ![支持 Markdown 排版的流式截图对话](docs/images/ask-ai.png) |
 
-## 安装
+## 快速上手
 
-从 [Releases](https://github.com/glin93/LumaShot/releases) 下载 **LumaShot-0.1.3-Setup-x64.exe**。安装包包含所需运行环境，安装到当前用户目录。
-
-**系统要求**：Windows 10 22H2 或 Windows 11，x64。v0.1.3 安装包尚未签名。
-
-ChatGPT 登录是可选安装组件，勾选后需阅读并接受其独立的非商业许可证。不安装该组件也可使用 OpenAI、Gemini 自带 Key。
-
-## 开始使用
-
-1. 按 **Ctrl + Shift + 2** 进行区域截图。
-2. 在截后浮窗中复制、保存或编辑。图片默认自动复制。
-3. 按 **Ctrl + Shift + H** 打开快速历史，或按 **Ctrl + Shift + L** 打开资料库。
-4. 在**设置**中修改快捷键、录屏音频、截图后操作和账号连接。
-
-关闭资料库窗口后，LumaShot 会继续在系统托盘运行。需要退出时选择**退出 LumaShot**。
+1. **捕获** — 按 `Ctrl + Shift + 2` 自由区域截图（默认自动复制到剪贴板）。
+2. **流转** — 在左侧截后浮窗中直接复制、编辑标注、问 AI，或按住卡片直接拖进微信/飞书/浏览器等目标窗口。
+3. **回溯** — 按 `Ctrl + Shift + H` 调出快速历史，或按 `Ctrl + Shift + L` 进入完整资料库检索标题、标签、备注与图内 OCR 文字。
 
 | 操作 | 默认快捷键 |
 | --- | --- |
@@ -59,25 +56,31 @@ ChatGPT 登录是可选安装组件，勾选后需阅读并接受其独立的非
 | 快速历史 | `Ctrl + Shift + H` |
 | 资料库 | `Ctrl + Shift + L` |
 
-以上快捷键均可修改。麦克风默认关闭，机内声音默认开启；图片和视频可分别设置完成后的复制、打开资料库或文件位置等操作。
+所有快捷键均可在**设置**中自由修改。关闭资料库主窗口后程序留在系统托盘持续待命，需要彻底退出时选择**退出 LumaShot** 即可。
+
+## 安装
+
+前往 [Releases](https://github.com/glin93/LumaShot/releases) 下载 **[LumaShot-0.1.4-Setup-x64.exe](https://github.com/glin93/LumaShot/releases/tag/v0.1.4)**。安装包已内置所需全部运行环境，支持 **Windows 10 (22H2+)** 与 **Windows 11 (x64)** 当前用户目录免管理员安装。
+
+> **说明：** v0.1.4 安装包尚未购买代码签名（首次运行时 SmartScreen 可能会提示确认）。安装向导中的 ChatGPT 登录为可选组件并附带独立非商业许可；使用 OpenAI / Gemini API Key 无需勾选该组件。
 
 ## 源码构建
 
-Windows 界面使用 C# / WPF，截图与标注基于 ShareX，媒体处理使用 FFmpeg，Node.js 后端负责 AI 与同步逻辑，rclone 负责云端传输。
+LumaShot 采用 C# / WPF 构建原生桌面界面，基于 ShareX 提供捕获与标注能力，FFmpeg 负责媒体处理，Node.js 后端驱动 AI 路由与同步状态机，rclone 负责云端增量传输。
 
-在仓库根目录使用 PowerShell 运行：
+在仓库根目录通过 PowerShell 运行以下命令即可按固定校验值下载依赖并完成构建：
 
 ```powershell
 ./bootstrap-windows.ps1
 ```
 
-脚本按固定版本与校验值下载依赖，按 npm lockfile 安装后端，并调用 Windows 自带的 .NET Framework 编译器构建。依赖准备完成后，可直接运行：
+依赖就绪后的日常增量编译：
 
 ```powershell
 ./build.ps1
 ```
 
-构建安装包需要 Inno Setup 7.1.1：
+如需构建安装程序（需安装 Inno Setup 7.1.1）：
 
 ```powershell
 ./build-installer.ps1 -Compiler 'C:\path\to\Inno Setup\ISCC.exe'

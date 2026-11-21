@@ -18,7 +18,10 @@ internal static class CaptureHost
     static object dispatcher,
         priority;
     static MethodInfo post;
-    static int generation;
+    static readonly object stateGate = new object();
+    static int generation,
+        activeOperation,
+        cancelledOperation;
     static bool verify;
     static readonly System.Collections.Generic.List<WeakReference> selectors =
         new System.Collections.Generic.List<WeakReference>();
@@ -168,6 +171,25 @@ internal static class CaptureHost
             {
                 if (command == "QUIT")
                     break;
+                if (command == "CANCEL")
+                {
+                    int target;
+                    lock (stateGate)
+                    {
+                        target = activeOperation;
+                        if (target != 0)
+                            cancelledOperation = target;
+                    }
+                    if (target != 0)
+                    {
+                        UI(() =>
+                        {
+                            CancelActiveSelector(false);
+                            return Task.FromResult(true);
+                        });
+                    }
+                    continue;
+                }
                 bool cancelFixture = verify && command == "VerifyCancel";
                 string capture =
                     command == "RectangleRegion" || cancelFixture ? "CaptureRegion"
@@ -179,51 +201,72 @@ internal static class CaptureHost
                     Reply("ERROR unsupported-command");
                     continue;
                 }
-                try
+                int operation;
+                lock (stateGate)
                 {
-                    UI(async () =>
+                    if (activeOperation != 0)
+                    {
+                        Reply("ERROR capture-busy");
+                        continue;
+                    }
+                    operation = ++generation;
+                    activeOperation = operation;
+                    cancelledOperation = 0;
+                }
+                UI(async () =>
+                {
+                    try
+                    {
+                        var clock = Stopwatch.StartNew();
+                        object settings = Call(Type("TaskSettings"), "GetDefaultTaskSettings");
+                        object captureSettings = Get(settings, "CaptureSettings");
+                        if (captureSettings != null)
+                            Set(captureSettings, "ShowCursor", false);
+                        var instance = Activator.CreateInstance(Type(capture));
+                        Reply("DISPATCH " + clock.ElapsedMilliseconds);
+                        if (capture == "CaptureRegion")
+                            ObserveSelector(clock, operation, cancelFixture);
+                        await (Task)
+                            Type("CaptureBase")
+                                .GetMethod("CaptureAsync", All)
+                                .Invoke(instance, new[] { settings, (object)false });
+                        while ((bool)Get(Type("TaskManager"), "IsBusy"))
+                            await Task.Delay(10);
+                        var tasks = (IList)Get(Type("TaskManager"), "Tasks");
+                        bool failed = false;
+                        for (int i = tasks.Count - 1; i >= 0; i--)
                         {
-                            var clock = Stopwatch.StartNew();
-                            int operation = ++generation;
-                            object settings = Call(Type("TaskSettings"), "GetDefaultTaskSettings");
-                            var instance = Activator.CreateInstance(Type(capture));
-                            Reply("DISPATCH " + clock.ElapsedMilliseconds);
-                            if (capture == "CaptureRegion")
-                                ObserveSelector(clock, operation, cancelFixture);
-                            await (Task)
-                                Type("CaptureBase")
-                                    .GetMethod("CaptureAsync", All)
-                                    .Invoke(instance, new[] { settings, (object)false });
-                            while ((bool)Get(Type("TaskManager"), "IsBusy"))
-                                await Task.Delay(10);
-                            var tasks = (IList)Get(Type("TaskManager"), "Tasks");
-                            bool failed = false;
-                            for (int i = tasks.Count - 1; i >= 0; i--)
-                            {
-                                object task = tasks[i];
-                                if (Get(task, "Status").ToString() == "Failed")
-                                    failed = true;
-                                Call(Type("TaskManager"), "Remove", task);
-                            }
-                            Call(Get(Type("TaskManager"), "RecentManager"), "Clear");
-                            Reply(
-                                failed
-                                    ? "ERROR capture-save-failed"
-                                    : "DONE " + clock.ElapsedMilliseconds
-                            );
-                            ReclaimWhenIdle(operation);
-                        })
-                        .GetAwaiter()
-                        .GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine(ex);
-                    Reply("ERROR capture-failed");
-                }
+                            object task = tasks[i];
+                            if (Get(task, "Status").ToString() == "Failed")
+                                failed = true;
+                            Call(Type("TaskManager"), "Remove", task);
+                        }
+                        Call(Get(Type("TaskManager"), "RecentManager"), "Clear");
+                        Reply(
+                            failed
+                                ? "ERROR capture-save-failed"
+                                : "DONE " + clock.ElapsedMilliseconds
+                        );
+                        ReclaimWhenIdle(operation);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(ex);
+                        Reply("ERROR capture-failed");
+                    }
+                    finally
+                    {
+                        lock (stateGate)
+                        {
+                            if (activeOperation == operation)
+                                activeOperation = 0;
+                        }
+                    }
+                });
             }
             UI(() =>
                 {
+                    CancelActiveSelector(true);
                     Call(Type("ApplicationLifecycle"), "Exit");
                     return Task.FromResult(true);
                 })
@@ -238,6 +281,63 @@ internal static class CaptureHost
         }
     }
 
+    static object FindRegionSelector()
+    {
+        var bootstrap = System.Type.GetType(
+            "ShareX.AvaloniaUI.Integration.AvaloniaBootstrapper, ShareX.Avalonia",
+            false
+        );
+        if (bootstrap == null)
+            return null;
+        var desktop = Get(bootstrap, "_desktopLifetime");
+        if (desktop == null)
+            return null;
+        var windows = (IEnumerable)Get(desktop, "Windows");
+        if (windows == null)
+            return null;
+        foreach (var window in windows)
+            if (window != null && window.GetType().Name == "RegionCaptureWindow")
+                return window;
+        return null;
+    }
+
+    static void CancelActiveSelector(bool force)
+    {
+        try
+        {
+            var selector = FindRegionSelector();
+            if (selector == null)
+                return;
+            if (!force)
+            {
+                bool regionActive = true;
+                try
+                {
+                    regionActive = (bool)Get(selector, "_regionToolActive");
+                }
+                catch { }
+                if (!regionActive)
+                {
+                    try
+                    {
+                        var workspace = Get(selector, "_editorWorkspace");
+                        if (
+                            workspace != null
+                            && (bool)Call(workspace, "CancelActiveInteractionOrSelection")
+                        )
+                            return;
+                    }
+                    catch { }
+                }
+            }
+            Call(selector, "CancelCapture");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+        }
+    }
+
     // Measure first visible selector without retaining any screenshot pixels.
     static async void ObserveSelector(Stopwatch clock, int operation, bool cancelFixture)
     {
@@ -246,43 +346,66 @@ internal static class CaptureHost
         {
             for (int i = 0; i < 400 && operation == generation; i++)
             {
-                bool visible = false;
+                IntPtr found = IntPtr.Zero;
                 EnumWindows(
                     (window, data) =>
                     {
                         uint owner;
                         GetWindowThreadProcessId(window, out owner);
                         if (owner == (uint)pid && IsWindowVisible(window))
-                            visible = true;
+                        {
+                            found = window;
+                            return false;
+                        }
                         return true;
                     },
                     IntPtr.Zero
                 );
-                if (visible)
+                if (found != IntPtr.Zero)
                 {
+                    SetForegroundWindow(found);
                     Reply("VISIBLE " + clock.ElapsedMilliseconds);
+                    bool shouldCancel;
+                    lock (stateGate)
+                        shouldCancel = cancelledOperation == operation;
+                    if (shouldCancel)
+                    {
+                        await UI(() =>
+                        {
+                            CancelActiveSelector(true);
+                            return Task.FromResult(true);
+                        });
+                        return;
+                    }
+                    await UI(() =>
+                    {
+                        var selector = FindRegionSelector();
+                        if (selector != null)
+                        {
+                            try
+                            {
+                                Call(selector, "Activate");
+                            }
+                            catch { }
+                        }
+                        return Task.FromResult(true);
+                    });
                     if (cancelFixture)
                     {
                         await Task.Delay(80);
-                        var bootstrap = System.Type.GetType(
-                            "ShareX.AvaloniaUI.Integration.AvaloniaBootstrapper, ShareX.Avalonia",
-                            true
-                        );
-                        var desktop = Get(bootstrap, "_desktopLifetime");
-                        var windows = (IEnumerable)Get(desktop, "Windows");
-                        object selector = null;
-                        foreach (var window in windows)
-                            if (window.GetType().Name == "RegionCaptureWindow")
-                                selector = window;
-                        if (selector != null)
+                        await UI(() =>
                         {
-                            selectors.Add(new WeakReference(selector));
-                            Call(selector, "CancelCapture");
-                            return;
-                        }
-                    }
-                    else
+                            var selector = FindRegionSelector();
+                            if (selector != null)
+                            {
+                                selectors.Add(new WeakReference(selector));
+                                Call(selector, "CancelCapture");
+                            }
+                            return Task.FromResult(true);
+                        });
                         return;
+                    }
+                    return;
                 }
                 await Task.Delay(5);
             }
@@ -330,4 +453,7 @@ internal static class CaptureHost
 
     [DllImport("user32.dll")]
     static extern bool IsWindowVisible(IntPtr window);
+
+    [DllImport("user32.dll")]
+    static extern bool SetForegroundWindow(IntPtr window);
 }

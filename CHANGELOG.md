@@ -1,3 +1,15 @@
+# 0.1.4
+
+- 静态截图默认隐藏鼠标指针与手型光标（`ShowCursor = false`），录屏仍保留光标显示（`ScreenRecordShowCursor = true`）。
+- 修复触发截图后按 `Esc` 无法取消的问题：向截图引擎移交前台焦点权限，并增加捕获期间的全局 `Esc` 取消热键与常驻宿主实时 `CANCEL` 指令兜底。
+- 截后浮窗在鼠标悬停、打开菜单或拖拽文件期间暂缓 15 秒自动消失，避免误打断操作。
+- 修复多显示器混合缩放下截图浮窗未更新目标屏幕信息的问题；修正自定义边框最小窗口尺寸约束，唤醒主窗口时保留最大化状态。
+- 搜索/筛选/切换视图前立即提交未保存的标签与备注草稿；统一预览窗顶栏按钮与下拉框矢量箭头样式。
+- Hide mouse cursors in static screenshots while keeping cursors visible in screen recordings.
+- Fix `Esc` cancellation after triggering capture by granting foreground activation to the capture host and adding an active-capture `Esc` cancel path.
+- Defer 15-second floating preview expiry while hovering, dragging, or interacting with a context menu.
+- Fix multi-monitor per-DPI preview placement, preserve maximized window state on restore, enforce minimum track sizes with custom chrome, and flush edits before search/navigation.
+
 # 0.1.3
 
 - 截后浮窗每张独立保留 15 秒，到期逐张消失；连续截图不延长已有浮窗的时间。

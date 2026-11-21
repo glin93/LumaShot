@@ -229,6 +229,15 @@ namespace LumaShot
             results.Add(
                 "PASS storage cleanup removes verified legacy poster, preserves original and backup references"
             );
+            var previewLife = new CapturePreviewLifetime();
+            previewLife.Add("hover-card", 0);
+            previewLife.ExtendAtLeast(new[] { "hover-card" }, 17.5);
+            SurfaceChecks.Require(
+                !previewLife.IsExpired("hover-card", 16)
+                    && previewLife.IsExpired("hover-card", 17.5),
+                "hover extension did not defer expiry"
+            );
+            results.Add("PASS floating preview interaction defers 15-second expiry cleanly");
         }
     }
 }

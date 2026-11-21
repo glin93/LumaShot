@@ -31,7 +31,8 @@ namespace LumaShot
             System.Diagnostics.Stopwatch.StartNew();
         DispatcherTimer previewExpiryTimer;
         bool surfacesSuspended,
-            capturing;
+            capturing,
+            railDragging;
         Rect railArea;
         List<Shot> quickResults = new List<Shot>();
         int quickSelected;
@@ -56,6 +57,25 @@ namespace LumaShot
         Rect PointerWorkArea()
         {
             return DisplayPlacement.WorkArea(F.Screen.FromPoint(F.Cursor.Position));
+        }
+
+        void UpdateRailScreen()
+        {
+            railScreen = F.Screen.FromPoint(F.Cursor.Position);
+            railArea = DisplayPlacement.WorkArea(railScreen);
+        }
+
+        bool RailInteracting()
+        {
+            return captureRail != null
+                && captureRail.IsVisible
+                && (
+                    captureRail.IsMouseOver
+                    || railDragging
+                    || railItems
+                        .Children.OfType<FrameworkElement>()
+                        .Any(x => x.ContextMenu != null && x.ContextMenu.IsOpen)
+                );
         }
 
         Window Surface(string title, bool activate)
@@ -127,11 +147,13 @@ namespace LumaShot
             previewExpiryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             previewExpiryTimer.Tick += (s, e) =>
             {
-                if (
-                    pendingCards.RemoveAll(id =>
-                        previewLifetime.IsExpired(id, previewClock.Elapsed.TotalSeconds)
-                    ) > 0
-                )
+                double now = previewClock.Elapsed.TotalSeconds;
+                if (RailInteracting())
+                {
+                    previewLifetime.ExtendAtLeast(pendingCards, now + 2.5);
+                    return;
+                }
+                if (pendingCards.RemoveAll(id => previewLifetime.IsExpired(id, now)) > 0)
                     RenderRail();
             };
             captureRail.PreviewKeyDown += (s, e) =>
@@ -166,11 +188,8 @@ namespace LumaShot
             pendingCards.Remove(shot.Id);
             pendingCards.Add(shot.Id);
             previewLifetime.Add(shot.Id, previewClock.Elapsed.TotalSeconds);
-            if (railArea.IsEmpty || railArea.Width == 0)
-            {
-                railScreen = F.Screen.FromPoint(F.Cursor.Position);
-                railArea = DisplayPlacement.WorkArea(railScreen);
-            }
+            if (railArea.IsEmpty || railArea.Width == 0 || railScreen == null)
+                UpdateRailScreen();
             RenderRail();
         }
 
@@ -184,9 +203,10 @@ namespace LumaShot
         {
             if (captureRail == null)
                 return;
-            pendingCards.RemoveAll(id =>
-                previewLifetime.IsExpired(id, previewClock.Elapsed.TotalSeconds)
-            );
+            if (!RailInteracting())
+                pendingCards.RemoveAll(id =>
+                    previewLifetime.IsExpired(id, previewClock.Elapsed.TotalSeconds)
+                );
             pendingCards.RemoveAll(id => !lib.Items.Any(x => x.Id == id && !x.Deleted));
             FitCaptureCards(
                 pendingCards,
@@ -228,9 +248,9 @@ namespace LumaShot
                         captureRail,
                         railScreen,
                         railArea.Left + 6,
-                        railArea.Bottom - height - 12,
+                        railArea.Bottom - captureRail.Height - 12,
                         246,
-                        height
+                        captureRail.Height
                     );
             }
             railScroll.ScrollToEnd();
@@ -549,11 +569,19 @@ namespace LumaShot
                 )
                     return;
                 drag = true;
-                DragDrop.DoDragDrop(
-                    outer,
-                    new DataObject(DataFormats.FileDrop, new[] { lib.Full(shot.File) }),
-                    DragDropEffects.Copy
-                );
+                railDragging = true;
+                try
+                {
+                    DragDrop.DoDragDrop(
+                        outer,
+                        new DataObject(DataFormats.FileDrop, new[] { lib.Full(shot.File) }),
+                        DragDropEffects.Copy
+                    );
+                }
+                finally
+                {
+                    railDragging = false;
+                }
             };
             outer.MouseLeftButtonUp += (s, e) =>
             {

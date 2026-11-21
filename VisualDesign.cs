@@ -260,7 +260,12 @@ namespace LumaShot
             );
             win.SourceInitialized += (s, e) =>
             {
-                HwndSource.FromHwnd(new WindowInteropHelper(win).Handle).AddHook(ChromeBounds);
+                HwndSource
+                    .FromHwnd(new WindowInteropHelper(win).Handle)
+                    .AddHook(
+                        (IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+                            ChromeBounds(win, hwnd, msg, wParam, lParam, ref handled)
+                    );
                 try
                 {
                     int preference = 2;
@@ -317,6 +322,7 @@ namespace LumaShot
         static extern bool GetMonitorInfo(IntPtr monitor, ref ChromeMonitor info);
 
         static IntPtr ChromeBounds(
+            Window win,
             IntPtr window,
             int message,
             IntPtr wParam,
@@ -334,6 +340,25 @@ namespace LumaShot
                     bounds.MaxPosition.Y = monitor.Work.Top - monitor.Monitor.Top;
                     bounds.MaxSize.X = monitor.Work.Right - monitor.Work.Left;
                     bounds.MaxSize.Y = monitor.Work.Bottom - monitor.Work.Top;
+                    var source = PresentationSource.FromVisual(win);
+                    double sx =
+                        source != null && source.CompositionTarget != null
+                            ? source.CompositionTarget.TransformToDevice.M11
+                            : 1;
+                    double sy =
+                        source != null && source.CompositionTarget != null
+                            ? source.CompositionTarget.TransformToDevice.M22
+                            : 1;
+                    if (win.MinWidth > 0)
+                        bounds.MinTrack.X = Math.Max(
+                            bounds.MinTrack.X,
+                            (int)Math.Ceiling(win.MinWidth * sx)
+                        );
+                    if (win.MinHeight > 0)
+                        bounds.MinTrack.Y = Math.Max(
+                            bounds.MinTrack.Y,
+                            (int)Math.Ceiling(win.MinHeight * sy)
+                        );
                     Marshal.StructureToPtr(bounds, lParam, false);
                     handled = true;
                 }

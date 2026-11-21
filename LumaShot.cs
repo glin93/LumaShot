@@ -389,11 +389,14 @@ namespace LumaShot
             status.Text = message;
         }
 
+        const int EscCancelHotkeyId = 100;
+
         internal void Show()
         {
             HideQuickHistory();
             Window.Show();
-            Window.WindowState = WindowState.Normal;
+            if (Window.WindowState == WindowState.Minimized)
+                Window.WindowState = WindowState.Normal;
             Window.Activate();
         }
 
@@ -429,7 +432,14 @@ namespace LumaShot
         {
             if (msg == 0x312)
             {
-                int index = wp.ToInt32() - 1;
+                int id = wp.ToInt32();
+                if (id == EscCancelHotkeyId)
+                {
+                    handled = true;
+                    engine.CancelActiveCapture();
+                    return IntPtr.Zero;
+                }
+                int index = id - 1;
                 if (index >= 0 && index < Preferences.Actions.Length)
                 {
                     handled = true;
@@ -452,6 +462,7 @@ namespace LumaShot
 
         void Navigate(string f)
         {
+            FlushEdits();
             batch.Clear();
             filter = f;
             shown = 48;
@@ -496,6 +507,7 @@ namespace LumaShot
 
         void Refresh()
         {
+            FlushEdits();
             RenderRail();
             if (quickHistory != null && quickHistory.IsVisible)
                 RenderQuickHistory();
@@ -1101,12 +1113,15 @@ namespace LumaShot
             }
             int count = lib.Items.Count;
             capturing = true;
-            railArea = PointerWorkArea();
+            UpdateRailScreen();
+            bool escHooked = false;
             try
             {
                 await PrepareCaptureSurfaces();
                 if (delay > 0)
                     await Task.Delay(delay);
+                if (action == "RectangleRegion" && handle != IntPtr.Zero && !demo)
+                    escHooked = Native.RegisterHotKey(handle, EscCancelHotkeyId, 0x4000, 0x1B);
                 await engine.Run(action, file);
                 await Scan(true);
                 Say(lib.Items.Count > count ? "已保存" : "已取消");
@@ -1118,6 +1133,8 @@ namespace LumaShot
             }
             finally
             {
+                if (escHooked && handle != IntPtr.Zero)
+                    Native.UnregisterHotKey(handle, EscCancelHotkeyId);
                 capturing = false;
                 ResumeSurfaces();
             }
@@ -1461,7 +1478,7 @@ namespace LumaShot
                 );
             if (record != null)
             {
-                var edit = TileButton(
+                var edit = SurfaceButton(
                     "编辑",
                     "编辑图片",
                     () =>
@@ -1474,16 +1491,17 @@ namespace LumaShot
                         selected = record;
                         win.Close();
                         Edit(false, path);
-                    },
-                    false
+                    }
                 );
-                edit.Width = 64;
                 edit.Height = 28;
-                edit.Margin = new Thickness(0, 0, 10, 0);
+                edit.Margin = new Thickness(0, 0, 8, 0);
                 Grid.SetColumn(edit, 1);
                 header.Children.Add(edit);
             }
             var close = TileButton("\uE711", "关闭预览 · Esc", () => win.Close(), true);
+            close.Background = Brushes.Transparent;
+            close.Foreground = B("#60657A");
+            close.BorderBrush = Brushes.Transparent;
             Grid.SetColumn(close, 2);
             header.Children.Add(close);
             header.MouseLeftButtonDown += (s, e) =>

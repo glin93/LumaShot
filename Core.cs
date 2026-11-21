@@ -384,6 +384,9 @@ namespace LumaShot
         [DllImport("user32.dll")]
         public static extern bool SetProcessDPIAware();
 
+        [DllImport("user32.dll")]
+        public static extern bool AllowSetForegroundWindow(int processId);
+
         [DllImport("dwmapi.dll")]
         public static extern int DwmFlush();
     }

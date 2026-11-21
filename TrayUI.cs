@@ -71,6 +71,7 @@ namespace LumaShot
                     "",
                     () =>
                     {
+                        Native.AllowSetForegroundWindow(-1);
                         win.Close();
                         action();
                     }

@@ -19,6 +19,16 @@ namespace LumaShot
             return deadlines.TryGetValue(id, out deadline) && now >= deadline;
         }
 
+        internal void ExtendAtLeast(IEnumerable<string> ids, double minDeadline)
+        {
+            foreach (string id in ids)
+            {
+                double deadline;
+                if (deadlines.TryGetValue(id, out deadline) && deadline < minDeadline)
+                    deadlines[id] = minDeadline;
+            }
+        }
+
         internal void Retain(IEnumerable<string> visible)
         {
             var retained = new HashSet<string>(visible);
